@@ -52,11 +52,11 @@ Plugins are directories containing a `plugin.json` manifest and an `index.js` en
 | 4 | Cost & Context Panels — token counts, per-request cost, context window progress bar | Done |
 | 5 | Permission Approval — sidebar cards for risky tool calls with Allow/Deny | Done |
 | 6 | Persistence & Polish — accent color, panel reorder/hide, recent plugins survive restarts | Done |
-| 7 | Plugin Loader — scan a `plugins/` directory, load manifests, render third-party panels | Planned |
-| 8 | Full PanelAPI & Permissions — write capabilities with user-granted permission prompts | Planned |
-| 9 | Plugin Management UI — list plugins, toggle enabled/disabled, revoke permissions | Planned |
-| 10 | Linux Support — titlebar accent, Claude path resolution, DEB/RPM packaging | Planned |
-| 11 | macOS Support — hidden-inset titlebar, Homebrew path resolution, DMG packaging | Planned |
+| 7 | Linux Support — titlebar accent, Claude path resolution, DEB/RPM packaging | Planned |
+| 8 | macOS Support — hidden-inset titlebar, Homebrew path resolution, DMG packaging | Planned |
+| 9 | Plugin Loader — scan a `plugins/` directory, load manifests, render third-party panels | Planned |
+| 10 | Full PanelAPI & Permissions — write capabilities with user-granted permission prompts | Planned |
+| 11 | Plugin Management UI — list plugins, toggle enabled/disabled, revoke permissions | Planned |
 
 ## Development Process
 
