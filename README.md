@@ -58,6 +58,10 @@ Plugins are directories containing a `plugin.json` manifest and an `index.js` en
 | 10 | Linux Support — titlebar accent, Claude path resolution, DEB/RPM packaging | Planned |
 | 11 | macOS Support — hidden-inset titlebar, Homebrew path resolution, DMG packaging | Planned |
 
+## Development Process
+
+Gada Terminal is built using the [Slice Flow](https://github.com/EnlightenMedia/slice-flow) workflow plugin for Claude Code — an iterative delivery method that cuts vertically through all layers in each slice, ensuring every increment is runnable and demonstrable.
+
 ## Contributing
 
 Pull requests are welcome. For significant changes, open an issue first to discuss what you'd like to change.
