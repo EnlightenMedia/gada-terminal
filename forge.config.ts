@@ -1,17 +1,29 @@
 import type { ForgeConfig } from '@electron-forge/shared-types';
 import { MakerSquirrel } from '@electron-forge/maker-squirrel';
+import { MakerDeb } from '@electron-forge/maker-deb';
+import { MakerRpm } from '@electron-forge/maker-rpm';
 import { VitePlugin } from '@electron-forge/plugin-vite';
 import { AutoUnpackNativesPlugin } from '@electron-forge/plugin-auto-unpack-natives';
 
 const config: ForgeConfig = {
   rebuildConfig: {
-    onlyModules: [],
+    onlyModules: process.platform === 'win32' ? [] : ['node-pty'],
   },
   packagerConfig: {
     asar: true,
   },
   makers: [
     new MakerSquirrel({}),
+    new MakerDeb({
+      options: {
+        icon: 'assets/icon.png',
+      },
+    }),
+    new MakerRpm({
+      options: {
+        icon: 'assets/icon.png',
+      },
+    }),
   ],
   plugins: [
     new AutoUnpackNativesPlugin({}),

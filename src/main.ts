@@ -269,7 +269,9 @@ ipcMain.on('window:set-accent-color', (_, color: string | null) => {
       color: accentColor,
       symbolColor: symbolColorFor(accentColor),
     });
-    mainWindow.setAccentColor(accentColor);
+    if (process.platform === 'win32') {
+      mainWindow.setAccentColor(accentColor);
+    }
   }
 });
 
