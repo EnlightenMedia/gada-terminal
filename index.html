@@ -729,11 +729,6 @@
       overflow: hidden;
     }
 
-    .perm-card.decided {
-      background: #212121;
-      border-color: #2e2e2e;
-    }
-
     .perm-card-header {
       display: flex;
       align-items: center;
@@ -758,8 +753,6 @@
       text-overflow: ellipsis;
     }
 
-    .perm-card.decided .perm-card-name { color: #d0d0d0; }
-
     .perm-badge {
       font-size: 9px;
       font-weight: 700;
@@ -775,14 +768,19 @@
     .perm-badge.session  { background: #0e1a22; color: #4eb8e8; border: 1px solid #1e3a5a; }
     .perm-badge.denied   { background: #2e1212; color: #e84e4e; border: 1px solid #5a1e1e; }
 
-    .perm-card-target {
-      padding: 0 8px 6px 8px;
+    .perm-card-input {
+      margin: 0 6px 6px 6px;
+      padding: 5px 7px;
       font-family: var(--font-mono);
-      font-size: 11px;
-      color: #777;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
+      font-size: 10px;
+      color: #999;
+      white-space: pre-wrap;
+      word-break: break-all;
+      background: #171510;
+      border: 1px solid #2a2218;
+      border-radius: 3px;
+      max-height: 120px;
+      overflow-y: auto;
     }
 
     .perm-card-actions {
@@ -790,8 +788,6 @@
       gap: 4px;
       padding: 0 8px 8px 8px;
     }
-
-    .perm-card.decided .perm-card-actions { display: none; }
 
     .perm-btn {
       flex: 1;
@@ -810,6 +806,114 @@
     .perm-btn.allow   { background: #1a2e1a; color: #4ec94e; border-color: #2a5a2a; }
     .perm-btn.session { background: #0e1a2e; color: #4eb8e8; border-color: #1e3a5a; }
     .perm-btn.deny    { background: #2e1a1a; color: #e84e4e; border-color: #5a2a2a; }
+
+    /* History button in section header */
+    .perm-history-btn {
+      margin-left: auto;
+      font-size: 10px;
+      padding: 1px 7px;
+      background: transparent;
+      border-color: #2e2e2e;
+      color: #444;
+    }
+    .perm-history-btn:hover { color: #888; background: #242424; }
+
+    /* Permissions history popup */
+    .perm-popup {
+      position: fixed;
+      inset: 0;
+      z-index: 2000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .perm-popup.hidden { display: none; }
+
+    .perm-popup-backdrop {
+      position: absolute;
+      inset: 0;
+      background: rgba(0,0,0,0.55);
+    }
+
+    .perm-popup-card {
+      position: relative;
+      width: 400px;
+      max-height: 70vh;
+      background: #242424;
+      border: 1px solid #333;
+      border-radius: 6px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .perm-popup-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 14px;
+      border-bottom: 1px solid #2e2e2e;
+      font-size: 12px;
+      font-weight: 600;
+      color: #aaa;
+      flex-shrink: 0;
+    }
+
+    .perm-popup-header button {
+      background: none;
+      border: none;
+      color: #555;
+      font-size: 16px;
+      line-height: 1;
+      padding: 0 2px;
+      cursor: pointer;
+    }
+
+    .perm-popup-header button:hover { color: #aaa; background: none; }
+
+    .perm-popup-list {
+      overflow-y: auto;
+      flex: 1;
+      padding: 4px 0;
+    }
+
+    .perm-popup-item {
+      padding: 6px 14px;
+      border-bottom: 1px solid #222;
+    }
+
+    .perm-popup-item:hover { background: #2a2a2a; }
+
+    .perm-popup-item-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .perm-popup-time {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: #484848;
+      flex-shrink: 0;
+    }
+
+    .perm-popup-tool {
+      font-size: 12px;
+      font-weight: 600;
+      color: #d0d0d0;
+      flex: 1;
+    }
+
+    .perm-popup-target {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: #555;
+      margin-top: 3px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
 
     /* ── Plugin chips ── */
 
@@ -1012,7 +1116,10 @@
         <div class="panel-section-body" id="tools-feed"></div>
       </div>
       <div class="panel-section hidden" id="section-permissions" draggable="true" data-section-id="permissions">
-        <div class="panel-section-header"><span class="panel-section-title">Permissions</span></div>
+        <div class="panel-section-header">
+          <span class="panel-section-title">Permissions</span>
+          <button id="btn-perm-history" class="perm-history-btn">History</button>
+        </div>
         <div class="panel-section-body" id="permissions-feed"></div>
       </div>
       <div class="panel-section hidden" id="section-cost" draggable="true" data-section-id="cost">
@@ -1063,6 +1170,18 @@
   </div>
 
   </div> <!-- #main-content -->
+
+  <!-- Permissions history popup -->
+  <div id="perm-history-popup" class="perm-popup hidden">
+    <div class="perm-popup-backdrop" id="perm-popup-backdrop"></div>
+    <div class="perm-popup-card">
+      <div class="perm-popup-header">
+        <span>Permission History</span>
+        <button id="perm-popup-close">×</button>
+      </div>
+      <div class="perm-popup-list" id="perm-popup-list"></div>
+    </div>
+  </div>
 
   <!-- Cost breakdown popup -->
   <div id="cost-breakdown-popup" class="cost-popup hidden">

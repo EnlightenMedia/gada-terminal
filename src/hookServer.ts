@@ -18,11 +18,16 @@ export function startHookServer(
     const pendingPermissions = new Map<string, http.ServerResponse>();
 
     function sendDecision(res: http.ServerResponse, decision: PermissionDecision): void {
-      const permissionDecision = decision === 'deny' ? 'deny' : 'allow';
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({
-        hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision },
-      }));
+      if (decision === 'passthrough') {
+        // No permissionDecision — Claude Code falls back to its own permission flow
+        res.end('{}');
+      } else {
+        const permissionDecision = decision === 'deny' ? 'deny' : 'allow';
+        res.end(JSON.stringify({
+          hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision },
+        }));
+      }
     }
 
     function decidePermission(id: string, decision: PermissionDecision): void {
@@ -75,7 +80,7 @@ function handleRequest(
   onToolEvent: (event: ToolEvent) => void,
   onApiRequest: (event: ApiRequestEvent) => void,
   contentType: string,
-  pendingPermissions: Map<string, { res: http.ServerResponse; timer: ReturnType<typeof setTimeout> }>,
+  pendingPermissions: Map<string, http.ServerResponse>,
   sendDecision: (res: http.ServerResponse, decision: PermissionDecision) => void,
   onPermissionNeeded: (req: PermissionRequest) => void
 ): void {

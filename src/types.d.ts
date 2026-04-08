@@ -30,7 +30,7 @@ export interface ApiRequestEvent {
   costUsd: number;
 }
 
-export type PermissionDecision = 'allow' | 'allow-session' | 'deny';
+export type PermissionDecision = 'allow' | 'allow-session' | 'deny' | 'passthrough';
 
 export interface PermissionRequest {
   id: string;

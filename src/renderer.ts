@@ -393,11 +393,52 @@ window.electronAPI.onToolEvent((event: ToolEvent) => {
 // ── Permission cards ──────────────────────────────────────────────────────────
 
 const permFeed = document.getElementById('permissions-feed') as HTMLElement;
+const permHistoryPopup = document.getElementById('perm-history-popup') as HTMLElement;
+const permPopupList = document.getElementById('perm-popup-list') as HTMLElement;
+const permPopupClose = document.getElementById('perm-popup-close') as HTMLElement;
+const permPopupBackdrop = document.getElementById('perm-popup-backdrop') as HTMLElement;
+const btnPermHistory = document.getElementById('btn-perm-history') as HTMLButtonElement;
+
+btnPermHistory.addEventListener('click', () => permHistoryPopup.classList.remove('hidden'));
+permPopupClose.addEventListener('click', () => permHistoryPopup.classList.add('hidden'));
+permPopupBackdrop.addEventListener('click', () => permHistoryPopup.classList.add('hidden'));
 
 function showPermissionsSection(): void {
   if (!hiddenSections.has('permissions')) return;
   hiddenSections.delete('permissions');
   applyPanelState();
+}
+
+function addPermHistory(req: PermissionRequest, label: string, badgeClass: string): void {
+  const item = document.createElement('div');
+  item.className = 'perm-popup-item';
+
+  const row = document.createElement('div');
+  row.className = 'perm-popup-item-row';
+
+  const timeEl = document.createElement('span');
+  timeEl.className = 'perm-popup-time';
+  timeEl.textContent = formatTime(req.timestamp);
+
+  const nameEl = document.createElement('span');
+  nameEl.className = 'perm-popup-tool';
+  nameEl.textContent = req.toolName;
+
+  const badge = document.createElement('span');
+  badge.className = `perm-badge ${badgeClass}`;
+  badge.textContent = label;
+
+  row.appendChild(timeEl);
+  row.appendChild(nameEl);
+  row.appendChild(badge);
+
+  const targetEl = document.createElement('div');
+  targetEl.className = 'perm-popup-target';
+  targetEl.textContent = extractTarget(req.toolName, req.input);
+
+  item.appendChild(row);
+  item.appendChild(targetEl);
+  permPopupList.prepend(item);
 }
 
 function createPermCard(req: PermissionRequest): HTMLElement {
@@ -423,17 +464,16 @@ function createPermCard(req: PermissionRequest): HTMLElement {
   header.appendChild(name);
   header.appendChild(badge);
 
-  const target = document.createElement('div');
-  target.className = 'perm-card-target';
-  target.textContent = extractTarget(req.toolName, req.input);
+  const inputEl = document.createElement('pre');
+  inputEl.className = 'perm-card-input';
+  inputEl.textContent = JSON.stringify(req.input, null, 2);
 
   const actions = document.createElement('div');
   actions.className = 'perm-card-actions';
 
   function decide(decision: PermissionDecision, label: string, badgeClass: string): void {
-    card.classList.add('decided');
-    badge.className = `perm-badge ${badgeClass}`;
-    badge.textContent = label;
+    card.remove();
+    addPermHistory(req, label, badgeClass);
     window.electronAPI.decidePermission(req.id, decision);
   }
 
@@ -457,13 +497,17 @@ function createPermCard(req: PermissionRequest): HTMLElement {
   actions.appendChild(btnDeny);
 
   card.appendChild(header);
-  card.appendChild(target);
+  card.appendChild(inputEl);
   card.appendChild(actions);
 
   return card;
 }
 
 window.electronAPI.onPermissionRequest((req: PermissionRequest) => {
+  if (hiddenSections.has('permissions')) {
+    window.electronAPI.decidePermission(req.id, 'passthrough');
+    return;
+  }
   showPermissionsSection();
   const card = createPermCard(req);
   permFeed.prepend(card);
