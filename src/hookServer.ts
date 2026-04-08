@@ -15,7 +15,7 @@ export function startHookServer(
   onPermissionNeeded: (req: PermissionRequest) => void
 ): Promise<HookServer> {
   return new Promise((resolve, reject) => {
-    const pendingPermissions = new Map<string, { res: http.ServerResponse; timer: ReturnType<typeof setTimeout> }>();
+    const pendingPermissions = new Map<string, http.ServerResponse>();
 
     function sendDecision(res: http.ServerResponse, decision: PermissionDecision): void {
       const permissionDecision = decision === 'deny' ? 'deny' : 'allow';
@@ -28,9 +28,8 @@ export function startHookServer(
     function decidePermission(id: string, decision: PermissionDecision): void {
       const pending = pendingPermissions.get(id);
       if (!pending) return;
-      clearTimeout(pending.timer);
       pendingPermissions.delete(id);
-      sendDecision(pending.res, decision);
+      sendDecision(pending, decision);
     }
 
     const server = http.createServer((req, res) => {
@@ -128,14 +127,8 @@ function handleRequest(
         hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: 'allow' },
       }));
     } else {
-      // Hold the HTTP response and wait for user decision (max 60 s)
-      const timer = setTimeout(() => {
-        const pending = pendingPermissions.get(id);
-        if (!pending) return;
-        pendingPermissions.delete(id);
-        sendDecision(pending.res, 'deny');
-      }, 60_000);
-      pendingPermissions.set(id, { res, timer });
+      // Hold the HTTP response open until the user decides
+      pendingPermissions.set(id, res);
       onPermissionNeeded({ id, toolName, input: toolInput, timestamp: Date.now() });
     }
 
