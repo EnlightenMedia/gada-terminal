@@ -441,6 +441,16 @@ function addPermHistory(req: PermissionRequest, label: string, badgeClass: strin
   permPopupList.prepend(item);
 }
 
+function formatPermInput(input: Record<string, unknown>): string {
+  const MAX_VAL = 120;
+  return Object.entries(input).map(([k, v]) => {
+    let s = typeof v === 'string' ? v : JSON.stringify(v);
+    s = s.replace(/\\n/g, '\n').replace(/\\t/g, '\t');
+    if (s.length > MAX_VAL) s = s.slice(0, MAX_VAL) + '…';
+    return `${k}: ${s}`;
+  }).join('\n');
+}
+
 function createPermCard(req: PermissionRequest): HTMLElement {
   const card = document.createElement('div');
   card.className = 'perm-card';
@@ -466,7 +476,7 @@ function createPermCard(req: PermissionRequest): HTMLElement {
 
   const inputEl = document.createElement('pre');
   inputEl.className = 'perm-card-input';
-  inputEl.textContent = JSON.stringify(req.input, null, 2);
+  inputEl.textContent = formatPermInput(req.input);
 
   const actions = document.createElement('div');
   actions.className = 'perm-card-actions';

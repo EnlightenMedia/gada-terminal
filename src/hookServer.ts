@@ -7,7 +7,7 @@ export interface HookServer {
   decidePermission: (id: string, decision: PermissionDecision) => void;
 }
 
-const AUTO_APPROVE = new Set(['Read', 'Glob', 'Grep', 'LS', 'NotebookRead']);
+const AUTO_APPROVE = new Set(['Read', 'Glob', 'Grep', 'LS', 'NotebookRead', 'TaskCreate', 'TaskUpdate', 'TaskGet', 'TaskList', 'TaskOutput']);
 
 export function startHookServer(
   onToolEvent: (event: ToolEvent) => void,
