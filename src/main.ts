@@ -192,6 +192,11 @@ async function createWindow(): Promise<void> {
       if (mainWindow && !mainWindow.isDestroyed()) {
         mainWindow.webContents.send('hook:permission-request', req);
       }
+    },
+    (mode: string) => {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('hook:permission-mode', mode);
+      }
     }
   );
   hookDecidePermission = hookServer.decidePermission.bind(hookServer);

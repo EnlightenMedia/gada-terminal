@@ -8,14 +8,17 @@ export interface HookServer {
 }
 
 const AUTO_APPROVE = new Set(['Read', 'Glob', 'Grep', 'LS', 'NotebookRead', 'TaskCreate', 'TaskUpdate', 'TaskGet', 'TaskList', 'TaskOutput']);
+const WRITE_TOOLS  = new Set(['Write', 'Edit', 'MultiEdit', 'NotebookEdit']);
 
 export function startHookServer(
   onToolEvent: (event: ToolEvent) => void,
   onApiRequest: (event: ApiRequestEvent) => void,
-  onPermissionNeeded: (req: PermissionRequest) => void
+  onPermissionNeeded: (req: PermissionRequest) => void,
+  onPermissionModeChange: (mode: string) => void
 ): Promise<HookServer> {
   return new Promise((resolve, reject) => {
     const pendingPermissions = new Map<string, http.ServerResponse>();
+    let lastPermMode = '';
 
     function sendDecision(res: http.ServerResponse, decision: PermissionDecision): void {
       res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -48,7 +51,9 @@ export function startHookServer(
       req.on('end', () => {
         try {
           const ct = req.headers['content-type'] ?? '';
-          handleRequest(req.url ?? '', Buffer.concat(chunks).toString('utf-8'), res, onToolEvent, onApiRequest, ct, pendingPermissions, sendDecision, onPermissionNeeded);
+          handleRequest(req.url ?? '', Buffer.concat(chunks).toString('utf-8'), res, onToolEvent, onApiRequest, ct, pendingPermissions, sendDecision, onPermissionNeeded, (mode) => {
+            if (mode !== lastPermMode) { lastPermMode = mode; onPermissionModeChange(mode); }
+          });
         } catch (err) {
           console.error('[hookServer] Unhandled error:', err);
           res.writeHead(500).end('{}');
@@ -82,7 +87,8 @@ function handleRequest(
   contentType: string,
   pendingPermissions: Map<string, http.ServerResponse>,
   sendDecision: (res: http.ServerResponse, decision: PermissionDecision) => void,
-  onPermissionNeeded: (req: PermissionRequest) => void
+  onPermissionNeeded: (req: PermissionRequest) => void,
+  onMode: (mode: string) => void
 ): void {
   if (url === '/v1/logs') {
     if (contentType.includes('json')) {
@@ -115,8 +121,11 @@ function handleRequest(
   const toolInput = (parsed['tool_input'] as Record<string, unknown>) ?? {};
   // Use Claude's stable tool_use_id for correlation; fall back to generated id
   const id = (parsed['tool_use_id'] as string) || generateId();
+  const permMode = (parsed['permission_mode'] as string) ?? 'default';
 
   if (hookEventName === 'PreToolUse') {
+    onMode(permMode);
+
     onToolEvent({
       id,
       event: 'PreToolUse',
@@ -125,7 +134,13 @@ function handleRequest(
       timestamp: Date.now(),
     });
 
-    if (AUTO_APPROVE.has(toolName)) {
+    const autoApprove =
+      AUTO_APPROVE.has(toolName) ||
+      (permMode === 'acceptEdits' && WRITE_TOOLS.has(toolName)) ||
+      permMode === 'bypassPermissions' ||
+      permMode === 'dontAsk';
+
+    if (autoApprove) {
       // Silent pass-through — no user prompt needed
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({

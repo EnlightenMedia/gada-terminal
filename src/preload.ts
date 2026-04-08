@@ -35,6 +35,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('hook:api-request', (_, event) => callback(event)),
   onPermissionRequest: (callback: (req: unknown) => void) =>
     ipcRenderer.on('hook:permission-request', (_, req) => callback(req)),
+  onPermissionMode: (callback: (mode: string) => void) =>
+    ipcRenderer.on('hook:permission-mode', (_, mode) => callback(mode)),
   decidePermission: (id: string, decision: string) =>
     ipcRenderer.invoke('permission:decide', id, decision),
 

@@ -403,6 +403,22 @@ btnPermHistory.addEventListener('click', () => permHistoryPopup.classList.remove
 permPopupClose.addEventListener('click', () => permHistoryPopup.classList.add('hidden'));
 permPopupBackdrop.addEventListener('click', () => permHistoryPopup.classList.add('hidden'));
 
+const permModeBadge = document.getElementById('perm-mode-badge') as HTMLElement;
+const PERM_MODE_LABELS: Record<string, string> = {
+  default: 'default',
+  acceptEdits: 'accept edits',
+  bypassPermissions: 'bypass',
+  dontAsk: "don't ask",
+  plan: 'plan',
+  auto: 'auto',
+};
+
+window.electronAPI.onPermissionMode((mode: string) => {
+  permModeBadge.textContent = PERM_MODE_LABELS[mode] ?? mode;
+  permModeBadge.className = `perm-mode-badge mode-${mode}`;
+  permModeBadge.style.display = '';
+});
+
 function showPermissionsSection(): void {
   if (!hiddenSections.has('permissions')) return;
   hiddenSections.delete('permissions');

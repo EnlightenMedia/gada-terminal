@@ -70,6 +70,7 @@ declare global {
       onToolEvent: (callback: (event: ToolEvent) => void) => void;
       onApiRequest: (callback: (event: ApiRequestEvent) => void) => void;
       onPermissionRequest: (callback: (req: PermissionRequest) => void) => void;
+      onPermissionMode: (callback: (mode: string) => void) => void;
 
       // File drag-and-drop (requires webUtils, not available via standard File.path with context isolation)
       getPathForFile: (file: File) => string;
