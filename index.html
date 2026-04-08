@@ -211,6 +211,7 @@
       overflow: hidden;
       cursor: pointer;
       transition: border-color 0.1s;
+      flex-shrink: 0;
     }
 
     .tool-card:hover {
@@ -727,6 +728,7 @@
       border: 1px solid #5a3e10;
       border-radius: 4px;
       overflow: hidden;
+      flex-shrink: 0;
     }
 
     .perm-card-header {
@@ -1129,6 +1131,7 @@
       <div class="panel-section" id="section-tools" draggable="true" data-section-id="tools">
         <div class="panel-section-header">
           <span class="panel-section-title">Tools</span>
+          <button id="btn-tool-history" class="perm-history-btn">History</button>
         </div>
         <div class="panel-section-body" id="tools-feed"></div>
       </div>
@@ -1188,6 +1191,18 @@
   </div>
 
   </div> <!-- #main-content -->
+
+  <!-- Tools history popup -->
+  <div id="tool-history-popup" class="perm-popup hidden">
+    <div class="perm-popup-backdrop" id="tool-popup-backdrop"></div>
+    <div class="perm-popup-card" style="width:420px">
+      <div class="perm-popup-header">
+        <span>Tool History</span>
+        <button id="tool-popup-close">×</button>
+      </div>
+      <div class="perm-popup-list" id="tool-popup-list" style="padding:6px;display:flex;flex-direction:column;gap:4px;"></div>
+    </div>
+  </div>
 
   <!-- Permissions history popup -->
   <div id="perm-history-popup" class="perm-popup hidden">

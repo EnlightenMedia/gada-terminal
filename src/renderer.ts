@@ -318,6 +318,18 @@ function extractTarget(toolName: string, input: Record<string, unknown>): string
 
 const toolCardMap = new Map<string, HTMLElement>();
 const toolsFeed = document.getElementById('tools-feed') as HTMLElement;
+const toolHistoryPopup = document.getElementById('tool-history-popup') as HTMLElement;
+const toolPopupList = document.getElementById('tool-popup-list') as HTMLElement;
+const toolPopupClose = document.getElementById('tool-popup-close') as HTMLElement;
+const toolPopupBackdrop = document.getElementById('tool-popup-backdrop') as HTMLElement;
+const btnToolHistory = document.getElementById('btn-tool-history') as HTMLButtonElement;
+
+btnToolHistory.addEventListener('click', () => toolHistoryPopup.classList.remove('hidden'));
+toolPopupClose.addEventListener('click', () => toolHistoryPopup.classList.add('hidden'));
+toolPopupBackdrop.addEventListener('click', () => toolHistoryPopup.classList.add('hidden'));
+
+const MAX_LIVE_TOOLS = 3;
+const liveFeedCards: HTMLElement[] = []; // ordered newest-first, mirrors toolsFeed DOM
 
 function createToolCard(event: ToolEvent): HTMLElement {
   const card = document.createElement('div');
@@ -383,6 +395,14 @@ window.electronAPI.onToolEvent((event: ToolEvent) => {
     const card = createToolCard(event);
     toolCardMap.set(event.id, card);
     toolsFeed.prepend(card);
+    liveFeedCards.unshift(card);
+
+    // Evict oldest card to history popup when live feed exceeds limit
+    while (liveFeedCards.length > MAX_LIVE_TOOLS) {
+      const oldest = liveFeedCards.pop()!;
+      oldest.remove();
+      toolPopupList.prepend(oldest);
+    }
   } else {
     const card = toolCardMap.get(event.id);
     if (card) updateToolCard(card, event);
@@ -450,7 +470,11 @@ function addPermHistory(req: PermissionRequest, label: string, badgeClass: strin
 
   const targetEl = document.createElement('div');
   targetEl.className = 'perm-popup-target';
-  targetEl.textContent = extractTarget(req.toolName, req.input);
+  targetEl.textContent = Object.entries(req.input).map(([k, v]) => {
+    let s = typeof v === 'string' ? v.replace(/\\n/g, ' ').replace(/\\t/g, ' ') : JSON.stringify(v);
+    if (s.length > 50) s = s.slice(0, 50) + '…';
+    return `${k}: ${s}`;
+  }).join('  ·  ');
 
   item.appendChild(row);
   item.appendChild(targetEl);
