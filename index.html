@@ -811,6 +811,75 @@
     .perm-btn.session { background: #0e1a2e; color: #4eb8e8; border-color: #1e3a5a; }
     .perm-btn.deny    { background: #2e1a1a; color: #e84e4e; border-color: #5a2a2a; }
 
+    /* ── Plugin chips ── */
+
+    #selected-plugins {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      min-height: 0;
+    }
+
+    .plugin-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      background: #2a2a2a;
+      border: 1px solid #444;
+      border-radius: 4px;
+      padding: 3px 8px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: #aaa;
+      max-width: 100%;
+    }
+
+    .plugin-chip-path {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      max-width: 280px;
+    }
+
+    .plugin-chip-remove {
+      background: none;
+      border: none;
+      color: #555;
+      font-size: 14px;
+      line-height: 1;
+      padding: 0;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+
+    .plugin-chip-remove:hover { color: #aaa; background: none; }
+
+    #recent-plugins-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      max-height: 80px;
+      overflow-y: auto;
+    }
+
+    .recent-plugin-item {
+      display: flex;
+      align-items: center;
+      padding: 4px 8px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: #666;
+      transition: background 0.1s;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .recent-plugin-item:hover { background: #2e2e2e; color: #aaa; }
+
     /* ── Scrollbars ── */
 
     ::-webkit-scrollbar {
@@ -906,6 +975,15 @@
       <div class="card-section">
         <label for="extra-args-input">Additional arguments</label>
         <input type="text" id="extra-args-input" placeholder="--verbose --no-stream …" />
+      </div>
+
+      <div class="card-section">
+        <label>Claude Code Plugins</label>
+        <div class="dir-row">
+          <button id="btn-browse-plugin">Browse…</button>
+        </div>
+        <div id="selected-plugins"></div>
+        <ul id="recent-plugins-list"></ul>
       </div>
 
       <button id="btn-start">Start Claude</button>

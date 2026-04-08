@@ -1,7 +1,7 @@
 import '@xterm/xterm/css/xterm.css';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
-import type { LaunchOptions, FolderSettings, ToolEvent, ApiRequestEvent, PermissionRequest, PermissionDecision } from './types';
+import type { LaunchOptions, FolderSettings, ToolEvent, ApiRequestEvent, PermissionRequest, PermissionDecision, PluginDescriptor } from './types';
 
 // ── Terminal setup ────────────────────────────────────────────────────────────
 
@@ -94,6 +94,10 @@ const DEFAULT_HIDDEN = new Set(['permissions', 'cost', 'context']);
 let sectionOrder: string[] = [...ALL_SECTIONS];
 const hiddenSections: Set<string> = new Set(DEFAULT_HIDDEN);
 
+// Plugin panels
+const pluginSections: string[] = [];
+const pluginIframes = new Map<string, { iframe: HTMLIFrameElement; permissions: string[] }>();
+
 function savePanelLayout(): void {
   window.electronAPI.setPanelLayout(selectedFolder ?? '', {
     order: sectionOrder,
@@ -117,7 +121,7 @@ function applyPanelState(): void {
   });
 }
 
-document.querySelectorAll<HTMLButtonElement>('.panel-toggle-btn').forEach(btn => {
+function wireToggleBtn(btn: HTMLButtonElement): void {
   btn.addEventListener('click', () => {
     const id = btn.dataset.section!;
     if (hiddenSections.has(id)) hiddenSections.delete(id);
@@ -125,14 +129,14 @@ document.querySelectorAll<HTMLButtonElement>('.panel-toggle-btn').forEach(btn =>
     applyPanelState();
     savePanelLayout();
   });
-});
+}
+
+document.querySelectorAll<HTMLButtonElement>('.panel-toggle-btn').forEach(wireToggleBtn);
 
 // Section drag-and-drop reorder
 let dragSectionId: string | null = null;
 
-document.querySelectorAll<HTMLElement>('.panel-section').forEach(section => {
-  const id = section.dataset.sectionId!;
-
+function wireSection(section: HTMLElement, id: string): void {
   section.addEventListener('dragstart', (e) => {
     dragSectionId = id;
     e.dataTransfer!.effectAllowed = 'move';
@@ -167,9 +171,120 @@ document.querySelectorAll<HTMLElement>('.panel-section').forEach(section => {
     );
     dragSectionId = null;
   });
+}
+
+document.querySelectorAll<HTMLElement>('.panel-section').forEach(section => {
+  wireSection(section, section.dataset.sectionId!);
 });
 
 applyPanelState();
+
+// ── Plugin panels ─────────────────────────────────────────────────────────────
+
+function buildSrcdoc(desc: PluginDescriptor): string {
+  const escaped = desc.entrySource.replace(/<\/script/gi, '<\\/script');
+  const shim = `(function(){
+  var _l={};
+  window.PanelAPI={
+    version:'1',
+    on:function(t,cb){if(!_l[t])_l[t]=[];_l[t].push(cb);},
+    getTheme:function(){return{background:'#181818',backgroundSecondary:'#212121',textPrimary:'#e0e0e0',textMuted:'#666',accent:'#4ec94e',fontUi:"-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif",fontMono:"'Cascadia Code',Consolas,monospace"};},
+    setTitle:function(t){window.parent.postMessage({type:'panel:setTitle',title:t},'*');},
+    setHeight:function(px){window.parent.postMessage({type:'panel:setHeight',height:px},'*');},
+  };
+  window.addEventListener('message',function(e){
+    if(!e.data||!e.data.type)return;
+    var t=String(e.data.type);
+    if(t.indexOf('event:')===0){
+      var et=t.slice(6),cbs=_l[et]||[];
+      for(var i=0;i<cbs.length;i++){try{cbs[i](e.data.payload);}catch(err){console.error('[Plugin ${desc.id}]',err);}}
+    }
+  });
+})();`;
+
+  return [
+    '<!DOCTYPE html><html><head><meta charset="UTF-8">',
+    '<style>',
+    '*{box-sizing:border-box;margin:0;padding:0;}',
+    'body{background:#181818;color:#e0e0e0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-size:12px;padding:6px;overflow-y:auto;}',
+    '::-webkit-scrollbar{width:6px;}::-webkit-scrollbar-track{background:transparent;}::-webkit-scrollbar-thumb{background:#444;border-radius:3px;}',
+    '</style></head><body>',
+    '<script>', shim, '</script>',
+    '<script>', escaped, '</script>',
+    '</body></html>',
+  ].join('\n');
+}
+
+function createPluginPanels(descriptors: PluginDescriptor[]): void {
+  if (descriptors.length === 0) return;
+
+  const toggleBar = document.getElementById('panel-toggle-bar')!;
+  const sectionsContainer = document.getElementById('panel-sections')!;
+
+  for (const desc of descriptors) {
+    pluginSections.push(desc.id);
+
+    // Toggle button
+    const btn = document.createElement('button');
+    btn.className = 'panel-toggle-btn active';
+    btn.dataset.section = desc.id;
+    btn.title = `Toggle ${desc.name}`;
+    btn.textContent = desc.name.slice(0, 5);
+    wireToggleBtn(btn);
+    toggleBar.appendChild(btn);
+
+    // Section
+    const section = document.createElement('div');
+    section.className = 'panel-section';
+    section.id = `section-${desc.id}`;
+    section.dataset.sectionId = desc.id;
+    section.draggable = true;
+    wireSection(section, desc.id);
+
+    const header = document.createElement('div');
+    header.className = 'panel-section-header';
+    const title = document.createElement('span');
+    title.className = 'panel-section-title';
+    title.textContent = desc.name;
+    header.appendChild(title);
+    section.appendChild(header);
+
+    const body = document.createElement('div');
+    body.className = 'panel-section-body';
+    body.style.cssText = 'padding:0;overflow:hidden;';
+
+    const iframe = document.createElement('iframe');
+    iframe.setAttribute('sandbox', 'allow-scripts');
+    iframe.style.cssText = 'width:100%;height:100%;border:none;display:block;background:#181818;';
+    iframe.srcdoc = buildSrcdoc(desc);
+    body.appendChild(iframe);
+    section.appendChild(body);
+    sectionsContainer.appendChild(section);
+
+    pluginIframes.set(desc.id, { iframe, permissions: desc.permissions });
+
+    // Handle postMessages from this plugin
+    window.addEventListener('message', (e: MessageEvent) => {
+      if (e.source !== iframe.contentWindow) return;
+      if (!e.data || !e.data.type) return;
+      if (e.data.type === 'panel:setTitle') {
+        title.textContent = String(e.data.title ?? desc.name);
+      } else if (e.data.type === 'panel:setHeight' && typeof e.data.height === 'number') {
+        iframe.style.height = `${e.data.height}px`;
+      }
+    });
+  }
+
+  sectionOrder = [...sectionOrder, ...pluginSections];
+}
+
+function forwardToPlugins(eventType: string, payload: unknown): void {
+  for (const [, { iframe, permissions }] of pluginIframes) {
+    if (permissions.includes(eventType)) {
+      iframe.contentWindow?.postMessage({ type: `event:${eventType}`, payload }, '*');
+    }
+  }
+}
 
 // ── Tool cards ────────────────────────────────────────────────────────────────
 
@@ -272,6 +387,7 @@ window.electronAPI.onToolEvent((event: ToolEvent) => {
     const card = toolCardMap.get(event.id);
     if (card) updateToolCard(card, event);
   }
+  forwardToPlugins('hook:tool-event', event);
 });
 
 // ── Permission cards ──────────────────────────────────────────────────────────
@@ -466,6 +582,7 @@ function updateContextPanel(event: ApiRequestEvent): void {
 window.electronAPI.onApiRequest((event: ApiRequestEvent) => {
   updateCostPanel(event);
   updateContextPanel(event);
+  forwardToPlugins('hook:api-request', event);
 });
 
 // ── Launch screen ─────────────────────────────────────────────────────────────
@@ -486,6 +603,66 @@ const optPermissionMode = document.getElementById('opt-permission-mode') as HTML
 
 let selectedFolder: string | null = null;
 let allFolderSettings: Record<string, FolderSettings> = {};
+let selectedPluginDirs: string[] = [];
+let recentPluginDirs: string[] = [];
+
+const btnBrowsePlugin = document.getElementById('btn-browse-plugin') as HTMLButtonElement;
+const selectedPluginsEl = document.getElementById('selected-plugins') as HTMLDivElement;
+const recentPluginsList = document.getElementById('recent-plugins-list') as HTMLUListElement;
+
+function renderPluginChips(): void {
+  selectedPluginsEl.innerHTML = '';
+  for (const dir of selectedPluginDirs) {
+    const chip = document.createElement('div');
+    chip.className = 'plugin-chip';
+
+    const pathEl = document.createElement('span');
+    pathEl.className = 'plugin-chip-path';
+    pathEl.textContent = dir;
+    pathEl.title = dir;
+
+    const removeBtn = document.createElement('button');
+    removeBtn.className = 'plugin-chip-remove';
+    removeBtn.textContent = '×';
+    removeBtn.addEventListener('click', () => {
+      selectedPluginDirs = selectedPluginDirs.filter(d => d !== dir);
+      renderPluginChips();
+      renderRecentPlugins();
+    });
+
+    chip.appendChild(pathEl);
+    chip.appendChild(removeBtn);
+    selectedPluginsEl.appendChild(chip);
+  }
+}
+
+function renderRecentPlugins(): void {
+  recentPluginsList.innerHTML = '';
+  const unselected = recentPluginDirs.filter(d => !selectedPluginDirs.includes(d));
+  for (const dir of unselected) {
+    const li = document.createElement('li');
+    li.className = 'recent-plugin-item';
+    li.textContent = dir;
+    li.title = dir;
+    li.addEventListener('click', () => {
+      if (!selectedPluginDirs.includes(dir)) {
+        selectedPluginDirs.push(dir);
+        renderPluginChips();
+        renderRecentPlugins();
+      }
+    });
+    recentPluginsList.appendChild(li);
+  }
+}
+
+btnBrowsePlugin.addEventListener('click', async () => {
+  const dir = await window.electronAPI.pickPluginDir();
+  if (dir && !selectedPluginDirs.includes(dir)) {
+    selectedPluginDirs.push(dir);
+    renderPluginChips();
+    renderRecentPlugins();
+  }
+});
 
 const titlebarText = document.getElementById('titlebar-text') as HTMLSpanElement;
 
@@ -512,15 +689,18 @@ function applySettings(settings: FolderSettings): void {
   optEffort.value = opts.effort ?? '';
   optPermissionMode.value = opts.permissionMode ?? '';
   extraArgsInput.value = opts.extraArgs ?? '';
+  selectedPluginDirs = opts.pluginDirs ? [...opts.pluginDirs] : [];
+  renderPluginChips();
 
   const layout = settings.panelLayout;
+  const allSectionIds = [...ALL_SECTIONS, ...pluginSections];
   if (layout) {
     const known = new Set(layout.order);
-    sectionOrder = [...layout.order, ...ALL_SECTIONS.filter(s => !known.has(s))];
+    sectionOrder = [...layout.order, ...allSectionIds.filter(s => !known.has(s))];
     hiddenSections.clear();
     for (const id of layout.hidden) hiddenSections.add(id);
   } else {
-    sectionOrder = [...ALL_SECTIONS];
+    sectionOrder = [...allSectionIds];
     hiddenSections.clear();
     for (const id of DEFAULT_HIDDEN) hiddenSections.add(id);
   }
@@ -532,6 +712,7 @@ function selectFolder(folder: string): void {
   selectedDirDisplay.textContent = folder;
   selectedDirDisplay.classList.add('has-path');
   applySettings(allFolderSettings[folder] ?? {});
+  window.electronAPI.getRecentPlugins().then(dirs => { recentPluginDirs = dirs; renderRecentPlugins(); });
 }
 
 function renderRecentFolders(folders: string[]): void {
@@ -564,6 +745,7 @@ function assembleArgs(): { args: string[]; cwd: string } {
   if (optModel.value) args.push('--model', optModel.value);
   if (optEffort.value) args.push('--effort', optEffort.value);
   if (optPermissionMode.value) args.push('--permission-mode', optPermissionMode.value);
+  for (const dir of selectedPluginDirs) args.push('--plugin-dir', dir);
   const extra = extraArgsInput.value.trim();
   if (extra) args.push(...extra.split(/\s+/).filter(Boolean));
   return { args, cwd: selectedFolder ?? '' };
@@ -577,8 +759,12 @@ function launch(): void {
     model: optModel.value || undefined,
     effort: optEffort.value || undefined,
     permissionMode: optPermissionMode.value || undefined,
+    pluginDirs: selectedPluginDirs.length > 0 ? selectedPluginDirs : undefined,
     extraArgs: extraArgsInput.value.trim() || undefined,
   };
+  if (selectedPluginDirs.length > 0) {
+    window.electronAPI.addRecentPlugins(selectedPluginDirs);
+  }
 
   window.electronAPI.setLaunchOptions(folderKey, launchOptions);
   window.electronAPI.setAccentColor(folderKey, accentColorInput.value !== '#4ec94e'
@@ -615,13 +801,18 @@ btnStart.addEventListener('click', launch);
 extraArgsInput.addEventListener('keydown', (e: KeyboardEvent) => { if (e.key === 'Enter') launch(); });
 
 (async () => {
-  const [recentFolders, initialArgs, settings] = await Promise.all([
+  const [recentFolders, initialArgs, settings, descriptors, recentPlugins] = await Promise.all([
     window.electronAPI.getRecentFolders(),
     window.electronAPI.getInitialArgs(),
     window.electronAPI.getAllFolderSettings(),
+    window.electronAPI.getPluginDescriptors(),
+    window.electronAPI.getRecentPlugins(),
   ]);
+  createPluginPanels(descriptors);
   allFolderSettings = settings;
   if (initialArgs.length > 0) extraArgsInput.value = initialArgs.join(' ');
   renderRecentFolders(recentFolders);
+  recentPluginDirs = recentPlugins;
   applySettings(allFolderSettings[''] ?? {});
+  renderRecentPlugins();
 })();

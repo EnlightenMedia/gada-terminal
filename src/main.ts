@@ -3,7 +3,7 @@ if (squirrelStartup) process.exit(0);
 
 import { app, BrowserWindow, ipcMain, clipboard, Menu, dialog, screen } from 'electron';
 import * as path from 'path';
-import { existsSync } from 'fs';
+import { existsSync, readdirSync, readFileSync, statSync } from 'fs';
 import * as pty from 'node-pty';
 import { IPty } from 'node-pty';
 import {
@@ -12,18 +12,66 @@ import {
   getFolderSettings,
   saveFolderSetting,
   addRecentFolder,
+  getRecentPlugins,
+  addRecentPlugins,
   getGlobalSettings,
   saveGlobalSettings,
 } from './persistence';
 import type { FolderSettings, LaunchOptions } from './persistence';
 import { startHookServer } from './hookServer';
 import { buildSettingsArgs } from './settingsBuilder';
-import type { ToolEvent, ApiRequestEvent, PermissionRequest, PermissionDecision } from './types';
+import type { ToolEvent, ApiRequestEvent, PermissionRequest, PermissionDecision, PluginDescriptor } from './types';
 
 declare const MAIN_WINDOW_VITE_DEV_SERVER_URL: string;
 declare const MAIN_WINDOW_VITE_NAME: string;
 
 let mainWindow: BrowserWindow | null = null;
+let plugins: PluginDescriptor[] = [];
+
+function loadPlugins(userDataPath: string): PluginDescriptor[] {
+  const scanDirs = [
+    path.join(userDataPath, 'plugins', 'panels'),
+    path.join(app.getAppPath(), 'plugins'),
+  ];
+
+  const descriptors: PluginDescriptor[] = [];
+  const seen = new Set<string>();
+
+  for (const scanDir of scanDirs) {
+    if (!existsSync(scanDir)) continue;
+    let entries: string[];
+    try { entries = readdirSync(scanDir); } catch { continue; }
+
+    for (const entry of entries) {
+      const pluginDir = path.join(scanDir, entry);
+      try { if (!statSync(pluginDir).isDirectory()) continue; } catch { continue; }
+
+      const manifestPath = path.join(pluginDir, 'panel-plugin.json');
+      if (!existsSync(manifestPath)) continue;
+
+      try {
+        const manifest = JSON.parse(readFileSync(manifestPath, 'utf-8'));
+        const { id, name, version, entry: entryFile, permissions } = manifest;
+        if (!id || typeof id !== 'string' || !entryFile || typeof entryFile !== 'string') continue;
+        if (seen.has(id)) continue;
+
+        const entryPath = path.join(pluginDir, entryFile);
+        if (!existsSync(entryPath)) continue;
+
+        seen.add(id);
+        descriptors.push({
+          id,
+          name: name ?? id,
+          version: version ?? '0.0.0',
+          permissions: Array.isArray(permissions) ? permissions : [],
+          entrySource: readFileSync(entryPath, 'utf-8'),
+        });
+      } catch { /* skip invalid plugins silently */ }
+    }
+  }
+
+  return descriptors;
+}
 let ptyProcess: IPty | null = null;
 let termCols = 80;
 let termRows = 24;
@@ -121,6 +169,7 @@ function clampBoundsToScreens(
 
 async function createWindow(): Promise<void> {
   userDataPath = app.getPath('userData');
+  plugins = loadPlugins(userDataPath);
 
   // Start hook server before showing the window so hookPort is ready for spawn
   const hookServer = await startHookServer(
@@ -284,6 +333,16 @@ ipcMain.handle('permission:decide', (_, id: string, decision: PermissionDecision
   pendingToolNames.delete(id);
   hookDecidePermission?.(id, decision);
 });
+
+// Plugins
+ipcMain.handle('plugins:get-descriptors', () => plugins);
+ipcMain.handle('plugins:pick-dir', async () => {
+  if (!mainWindow) return null;
+  const result = await dialog.showOpenDialog(mainWindow, { properties: ['openDirectory'] });
+  return result.canceled ? null : (result.filePaths[0] ?? null);
+});
+ipcMain.handle('plugins:get-recent', () => getRecentPlugins(userDataPath));
+ipcMain.on('plugins:add-recent', (_, dirs: string[]) => addRecentPlugins(userDataPath, dirs));
 
 // Clipboard
 ipcMain.handle('clipboard:read', () => clipboard.readText());

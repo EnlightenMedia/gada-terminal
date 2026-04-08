@@ -40,4 +40,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // File drag-and-drop path extraction (File.path unavailable with context isolation)
   getPathForFile: (file: File) => webUtils.getPathForFile(file),
+
+  // Panel plugin loading
+  getPluginDescriptors: () => ipcRenderer.invoke('plugins:get-descriptors'),
+
+  // Claude Code plugin dirs (launch screen)
+  pickPluginDir: () => ipcRenderer.invoke('plugins:pick-dir'),
+  getRecentPlugins: () => ipcRenderer.invoke('plugins:get-recent'),
+  addRecentPlugins: (dirs: string[]) => ipcRenderer.send('plugins:add-recent', dirs),
 });

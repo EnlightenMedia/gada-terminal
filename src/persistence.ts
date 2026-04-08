@@ -6,6 +6,7 @@ export interface LaunchOptions {
   model?: string;
   effort?: string;
   permissionMode?: string;
+  pluginDirs?: string[];
   extraArgs?: string;
 }
 
@@ -79,4 +80,15 @@ export function addRecentFolder(userDataPath: string, folder: string): void {
   const existing = getRecentFolders(userDataPath);
   const updated = [folder, ...existing.filter(f => f !== folder)].slice(0, 10);
   saveRecentFolders(userDataPath, updated);
+}
+
+export function getRecentPlugins(userDataPath: string): string[] {
+  return loadJSON<string[]>(path.join(userDataPath, 'recent-plugins.json'), []);
+}
+
+export function addRecentPlugins(userDataPath: string, dirs: string[]): void {
+  if (dirs.length === 0) return;
+  const existing = getRecentPlugins(userDataPath);
+  const merged = [...dirs, ...existing.filter(d => !dirs.includes(d))].slice(0, 20);
+  saveJSON(path.join(userDataPath, 'recent-plugins.json'), merged);
 }

@@ -2,6 +2,14 @@ import type { LaunchOptions, FolderSettings } from './persistence';
 
 export type { LaunchOptions, FolderSettings };
 
+export interface PluginDescriptor {
+  id: string;
+  name: string;
+  version: string;
+  permissions: string[];
+  entrySource: string;
+}
+
 export interface ToolEvent {
   id: string;
   event: 'PreToolUse' | 'PostToolUse' | 'PostToolUseFailure';
@@ -65,6 +73,14 @@ declare global {
 
       // File drag-and-drop (requires webUtils, not available via standard File.path with context isolation)
       getPathForFile: (file: File) => string;
+
+      // Panel plugin loading
+      getPluginDescriptors: () => Promise<PluginDescriptor[]>;
+
+      // Claude Code plugin dirs (launch screen)
+      pickPluginDir: () => Promise<string | null>;
+      getRecentPlugins: () => Promise<string[]>;
+      addRecentPlugins: (dirs: string[]) => void;
     };
   }
 }
