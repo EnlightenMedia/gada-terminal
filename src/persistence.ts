@@ -13,6 +13,7 @@ export interface LaunchOptions {
 export interface FolderSettings {
   accentColor?: string;
   panelLayout?: { order: string[]; hidden: string[] };
+  sidebarWidth?: number;
   launchOptions?: LaunchOptions;
   enabledPlugins?: string[];
 }

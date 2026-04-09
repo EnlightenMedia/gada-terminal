@@ -12,6 +12,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.send('folders:set-launch-options', folder, options),
   setPanelLayout: (folder: string, layout: { order: string[]; hidden: string[] }) =>
     ipcRenderer.send('folders:set-panel-layout', folder, layout),
+  setSidebarWidth: (folder: string, width: number) =>
+    ipcRenderer.send('folders:set-sidebar-width', folder, width),
   setWindowAccentColor: (color: string | null) =>
     ipcRenderer.send('window:set-accent-color', color),
 

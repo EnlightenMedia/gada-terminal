@@ -50,6 +50,7 @@ declare global {
       setAccentColor: (folder: string, color: string | undefined) => void;
       setLaunchOptions: (folder: string, options: LaunchOptions) => void;
       setPanelLayout: (folder: string, layout: { order: string[]; hidden: string[] }) => void;
+      setSidebarWidth: (folder: string, width: number) => void;
       setWindowAccentColor: (color: string | null) => void;
 
       // Renderer → Main (invoke, returns Promise)

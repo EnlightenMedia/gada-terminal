@@ -86,6 +86,44 @@ container.addEventListener('drop', (e: DragEvent) => {
   }
 });
 
+// ── Sidebar resize ────────────────────────────────────────────────────────────
+
+const sidebarPanel = document.getElementById('panel') as HTMLElement;
+const sidebarResizeHandle = document.getElementById('sidebar-resize-handle') as HTMLElement;
+const MIN_SIDEBAR_WIDTH = 200;
+const MAX_SIDEBAR_WIDTH = 700;
+let sidebarSaveTimeout: ReturnType<typeof setTimeout> | null = null;
+
+function applySidebarWidth(width: number): void {
+  sidebarPanel.style.width = `${width}px`;
+}
+
+sidebarResizeHandle.addEventListener('mousedown', (e) => {
+  e.preventDefault();
+  sidebarResizeHandle.classList.add('dragging');
+  const startX = e.clientX;
+  const startWidth = sidebarPanel.offsetWidth;
+
+  function onMouseMove(mv: MouseEvent): void {
+    const newWidth = Math.max(MIN_SIDEBAR_WIDTH, Math.min(MAX_SIDEBAR_WIDTH, startWidth + (startX - mv.clientX)));
+    applySidebarWidth(newWidth);
+  }
+
+  function onMouseUp(): void {
+    sidebarResizeHandle.classList.remove('dragging');
+    document.removeEventListener('mousemove', onMouseMove);
+    document.removeEventListener('mouseup', onMouseUp);
+    const finalWidth = sidebarPanel.offsetWidth;
+    if (sidebarSaveTimeout) clearTimeout(sidebarSaveTimeout);
+    sidebarSaveTimeout = setTimeout(() => {
+      window.electronAPI.setSidebarWidth(selectedFolder ?? '', finalWidth);
+    }, 300);
+  }
+
+  document.addEventListener('mousemove', onMouseMove);
+  document.addEventListener('mouseup', onMouseUp);
+});
+
 // ── Panel (sidebar) ───────────────────────────────────────────────────────────
 
 const ALL_SECTIONS = ['tools', 'permissions', 'cost', 'context'];
@@ -615,8 +653,7 @@ function fmtTokensFull(n: number): string {
 }
 
 function getContextWindow(model: string): number {
-  // All current Claude models support 200k context
-  void model;
+  if (model.includes('[1m]')) return 1_000_000;
   return 200_000;
 }
 
@@ -785,6 +822,8 @@ function applySettings(settings: FolderSettings): void {
   extraArgsInput.value = opts.extraArgs ?? '';
   selectedPluginDirs = opts.pluginDirs ? [...opts.pluginDirs] : [];
   renderPluginChips();
+
+  if (settings.sidebarWidth) applySidebarWidth(settings.sidebarWidth);
 
   const layout = settings.panelLayout;
   const allSectionIds = [...ALL_SECTIONS, ...pluginSections];
