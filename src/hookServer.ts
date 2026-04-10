@@ -4,7 +4,7 @@ import type { ToolEvent, ApiRequestEvent, PermissionDecision, PermissionRequest 
 export interface HookServer {
   port: number;
   close: () => void;
-  decidePermission: (id: string, decision: PermissionDecision) => void;
+  decidePermission: (id: string, decision: PermissionDecision, reason?: string) => void;
 }
 
 const AUTO_APPROVE = new Set(['Read', 'Glob', 'Grep', 'LS', 'NotebookRead', 'TaskCreate', 'TaskUpdate', 'TaskGet', 'TaskList', 'TaskOutput']);
@@ -14,30 +14,30 @@ export function startHookServer(
   onToolEvent: (event: ToolEvent) => void,
   onApiRequest: (event: ApiRequestEvent) => void,
   onPermissionNeeded: (req: PermissionRequest) => void,
-  onPermissionModeChange: (mode: string) => void
+  onPermissionModeChange: (mode: string) => void,
+  onPermissionCancelled: (id: string) => void
 ): Promise<HookServer> {
   return new Promise((resolve, reject) => {
     const pendingPermissions = new Map<string, http.ServerResponse>();
     let lastPermMode = '';
 
-    function sendDecision(res: http.ServerResponse, decision: PermissionDecision): void {
+    function sendDecision(res: http.ServerResponse, decision: PermissionDecision, reason?: string): void {
       res.writeHead(200, { 'Content-Type': 'application/json' });
       if (decision === 'passthrough') {
-        // No permissionDecision — Claude Code falls back to its own permission flow
         res.end('{}');
       } else {
         const permissionDecision = decision === 'deny' ? 'deny' : 'allow';
-        res.end(JSON.stringify({
-          hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision },
-        }));
+        const output: Record<string, unknown> = { hookEventName: 'PreToolUse', permissionDecision };
+        if (reason) output['permissionDecisionReason'] = reason;
+        res.end(JSON.stringify({ hookSpecificOutput: output }));
       }
     }
 
-    function decidePermission(id: string, decision: PermissionDecision): void {
+    function decidePermission(id: string, decision: PermissionDecision, reason?: string): void {
       const pending = pendingPermissions.get(id);
       if (!pending) return;
       pendingPermissions.delete(id);
-      sendDecision(pending, decision);
+      sendDecision(pending, decision, reason);
     }
 
     const server = http.createServer((req, res) => {
@@ -53,7 +53,7 @@ export function startHookServer(
           const ct = req.headers['content-type'] ?? '';
           handleRequest(req.url ?? '', Buffer.concat(chunks).toString('utf-8'), res, onToolEvent, onApiRequest, ct, pendingPermissions, sendDecision, onPermissionNeeded, (mode) => {
             if (mode !== lastPermMode) { lastPermMode = mode; onPermissionModeChange(mode); }
-          });
+          }, onPermissionCancelled);
         } catch (err) {
           console.error('[hookServer] Unhandled error:', err);
           res.writeHead(500).end('{}');
@@ -86,9 +86,10 @@ function handleRequest(
   onApiRequest: (event: ApiRequestEvent) => void,
   contentType: string,
   pendingPermissions: Map<string, http.ServerResponse>,
-  sendDecision: (res: http.ServerResponse, decision: PermissionDecision) => void,
+  sendDecision: (res: http.ServerResponse, decision: PermissionDecision, reason?: string) => void,
   onPermissionNeeded: (req: PermissionRequest) => void,
-  onMode: (mode: string) => void
+  onMode: (mode: string) => void,
+  onPermissionCancelled: (id: string) => void
 ): void {
   if (url === '/v1/logs') {
     if (contentType.includes('json')) {
@@ -147,8 +148,15 @@ function handleRequest(
         hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: 'allow' },
       }));
     } else {
-      // Hold the HTTP response open until the user decides
+      // Hold the HTTP response open until the user decides.
+      // If Claude Code closes the connection first (timeout), remove the stale card.
       pendingPermissions.set(id, res);
+      res.on('close', () => {
+        if (pendingPermissions.has(id)) {
+          pendingPermissions.delete(id);
+          onPermissionCancelled(id);
+        }
+      });
       onPermissionNeeded({ id, toolName, input: toolInput, timestamp: Date.now() });
     }
 

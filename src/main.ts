@@ -85,7 +85,7 @@ let userDataPath: string;
 let currentFolder = '';
 let hookPort = 0;
 let hookServerClose: (() => void) | null = null;
-let hookDecidePermission: ((id: string, decision: PermissionDecision) => void) | null = null;
+let hookDecidePermission: ((id: string, decision: PermissionDecision, reason?: string) => void) | null = null;
 
 const sessionAllowedTools = new Set<string>();
 const pendingToolNames = new Map<string, string>(); // id → toolName
@@ -217,6 +217,11 @@ async function createWindow(): Promise<void> {
     (mode: string) => {
       if (mainWindow && !mainWindow.isDestroyed()) {
         mainWindow.webContents.send('hook:permission-mode', mode);
+      }
+    },
+    (id: string) => {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('hook:permission-cancelled', id);
       }
     }
   );
@@ -359,13 +364,13 @@ ipcMain.on('window:set-accent-color', (_, color: string | null) => {
 });
 
 // Permission approval
-ipcMain.handle('permission:decide', (_, id: string, decision: PermissionDecision) => {
+ipcMain.handle('permission:decide', (_, id: string, decision: PermissionDecision, reason?: string) => {
   if (decision === 'allow-session') {
     const toolName = pendingToolNames.get(id);
     if (toolName) sessionAllowedTools.add(toolName);
   }
   pendingToolNames.delete(id);
-  hookDecidePermission?.(id, decision);
+  hookDecidePermission?.(id, decision, reason);
 });
 
 // Widgets

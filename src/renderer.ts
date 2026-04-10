@@ -666,6 +666,7 @@ function formatPermInput(input: Record<string, unknown>): string {
 function createPermCard(req: PermissionRequest): HTMLElement {
   const card = document.createElement('div');
   card.className = 'perm-card';
+  card.dataset['permId'] = req.id;
 
   const header = document.createElement('div');
   header.className = 'perm-card-header';
@@ -690,13 +691,19 @@ function createPermCard(req: PermissionRequest): HTMLElement {
   inputEl.className = 'perm-card-input';
   inputEl.textContent = formatPermInput(req.input);
 
+  const noteInput = document.createElement('input');
+  noteInput.type = 'text';
+  noteInput.className = 'perm-card-note';
+  noteInput.placeholder = 'Add a note (optional)';
+
   const actions = document.createElement('div');
   actions.className = 'perm-card-actions';
 
   function decide(decision: PermissionDecision, label: string, badgeClass: string): void {
+    const reason = noteInput.value.trim() || undefined;
     card.remove();
     addPermHistory(req, label, badgeClass);
-    window.electronAPI.decidePermission(req.id, decision);
+    window.electronAPI.decidePermission(req.id, decision, reason);
   }
 
   const btnAllow = document.createElement('button');
@@ -720,6 +727,7 @@ function createPermCard(req: PermissionRequest): HTMLElement {
 
   card.appendChild(header);
   card.appendChild(inputEl);
+  card.appendChild(noteInput);
   card.appendChild(actions);
 
   return card;
@@ -733,6 +741,11 @@ window.electronAPI.onPermissionRequest((req: PermissionRequest) => {
   showPermissionsSection();
   const card = createPermCard(req);
   permFeed.prepend(card);
+});
+
+window.electronAPI.onPermissionCancelled((id: string) => {
+  const card = permFeed.querySelector(`[data-perm-id="${id}"]`);
+  if (card) card.remove();
 });
 
 // ── Widget capability approval cards ─────────────────────────────────────────

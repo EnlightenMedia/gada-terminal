@@ -864,7 +864,8 @@
     .perm-badge.pending  { background: #2e2210; color: #e8a838; border: 1px solid #5a3e10; }
     .perm-badge.allowed  { background: #122212; color: #4ec94e; border: 1px solid #1e4a1e; }
     .perm-badge.session  { background: #0e1a22; color: #4eb8e8; border: 1px solid #1e3a5a; }
-    .perm-badge.denied   { background: #2e1212; color: #e84e4e; border: 1px solid #5a1e1e; }
+    .perm-badge.denied    { background: #2e1212; color: #e84e4e; border: 1px solid #5a1e1e; }
+    .perm-badge.override  { background: #1a1a2e; color: #a0a0c8; border: 1px solid #3a3a5a; }
 
     .perm-card-input {
       margin: 0 6px 6px 6px;
@@ -880,6 +881,23 @@
       max-height: 120px;
       overflow-y: auto;
     }
+
+    .perm-card-note {
+      display: block;
+      width: calc(100% - 16px);
+      margin: 0 8px 6px 8px;
+      padding: 4px 7px;
+      font-size: 11px;
+      font-family: var(--font-ui);
+      color: #bbb;
+      background: #171510;
+      border: 1px solid #2a2218;
+      border-radius: 3px;
+      outline: none;
+      box-sizing: border-box;
+    }
+    .perm-card-note::placeholder { color: #555; }
+    .perm-card-note:focus { border-color: #4a4030; }
 
     .perm-card-actions {
       display: flex;
@@ -903,7 +921,8 @@
 
     .perm-btn.allow   { background: #1a2e1a; color: #4ec94e; border-color: #2a5a2a; }
     .perm-btn.session { background: #0e1a2e; color: #4eb8e8; border-color: #1e3a5a; }
-    .perm-btn.deny    { background: #2e1a1a; color: #e84e4e; border-color: #5a2a2a; }
+    .perm-btn.deny     { background: #2e1a1a; color: #e84e4e; border-color: #5a2a2a; }
+    .perm-btn.override { background: transparent; color: #6a6a8a; border-color: #3a3a5a; }
 
     /* Permission mode badge in section header */
     .perm-mode-badge {

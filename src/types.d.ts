@@ -74,7 +74,7 @@ declare global {
       getAllFolderSettings: () => Promise<Record<string, FolderSettings>>;
 
       // Renderer → Main (invoke, returns Promise)
-      decidePermission: (id: string, decision: PermissionDecision) => Promise<void>;
+      decidePermission: (id: string, decision: PermissionDecision, reason?: string) => Promise<void>;
 
       // Main → Renderer (event subscriptions)
       onTerminalData: (callback: (data: string) => void) => void;
@@ -83,6 +83,7 @@ declare global {
       onApiRequest: (callback: (event: ApiRequestEvent) => void) => void;
       onPermissionRequest: (callback: (req: PermissionRequest) => void) => void;
       onPermissionMode: (callback: (mode: string) => void) => void;
+      onPermissionCancelled: (callback: (id: string) => void) => void;
 
       // File drag-and-drop (requires webUtils, not available via standard File.path with context isolation)
       getPathForFile: (file: File) => string;
