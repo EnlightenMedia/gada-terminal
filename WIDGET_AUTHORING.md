@@ -1,35 +1,35 @@
-# Panel Plugin Authoring Guide
+# Widget Authoring Guide
 
-Gada Terminal supports panel plugins — small JavaScript bundles that render
-inside sandboxed iframes in the sidebar. Plugins can subscribe to live session
+Gada Terminal supports widgets — small JavaScript bundles that render
+inside sandboxed iframes in the sidebar. Widgets can subscribe to live session
 events and, with user approval, perform write operations in the host app.
 
 ---
 
-## Plugin structure
+## Widget structure
 
-A plugin is a directory containing two files:
+A widget is a directory containing two files:
 
 ```
-my-plugin/
-  panel-plugin.json   ← manifest
-  index.js            ← entry point
+my-widget/
+  widget.json   ← manifest
+  index.js      ← entry point
 ```
 
 Place it in either:
-- `<userData>/plugins/panels/my-plugin/` — persists across app updates
-- A custom directory selected from the launch screen plugin picker
+- `<userData>/widgets/my-widget/` — persists across app updates
+- `<appPath>/widgets/my-widget/` — bundled with the app
 
 ---
 
-## Manifest — `panel-plugin.json`
+## Manifest — `widget.json`
 
 ```json
 {
-  "id": "my-plugin",
-  "name": "My Plugin",
+  "id": "my-widget",
+  "name": "My Widget",
   "version": "1.0.0",
-  "description": "What this plugin does.",
+  "description": "What this widget does.",
   "entry": "index.js",
   "permissions": ["hook:tool-event"],
   "capabilities": ["terminal:write"]
@@ -42,7 +42,7 @@ Place it in either:
 | `name` | Yes | Display name shown in the sidebar header and toggle bar. |
 | `version` | No | Semver string. Defaults to `0.0.0`. |
 | `description` | No | Human-readable description. |
-| `entry` | Yes | Filename of the entry script relative to the plugin directory. |
+| `entry` | Yes | Filename of the entry script relative to the widget directory. |
 | `permissions` | No | Read-only event subscriptions. Array of event type strings. |
 | `capabilities` | No | Write operations requiring user approval. Array of capability strings. |
 
@@ -67,24 +67,24 @@ These require the user to approve the first use. Grants can be permanent
 | `process:spawn` | Spawn a child process and capture stdout/stderr. |
 | `http:request` | Make an outbound HTTP/HTTPS request. |
 
-A plugin that attempts to use a capability not listed in its manifest receives
+A widget that attempts to use a capability not listed in its manifest receives
 an error immediately — no approval prompt is shown.
 
 ---
 
-## PanelAPI reference
+## WidgetAPI reference
 
-The global `window.PanelAPI` object is injected into every plugin iframe.
+The global `window.WidgetAPI` object is injected into every widget iframe.
 
 ### Read methods (no approval required)
 
-#### `PanelAPI.on(eventType, callback)`
+#### `WidgetAPI.on(eventType, callback)`
 
-Subscribe to an event stream. The plugin must declare the corresponding
+Subscribe to an event stream. The widget must declare the corresponding
 `permissions` entry in its manifest or the event will never fire.
 
 ```js
-PanelAPI.on('hook:tool-event', function(event) {
+WidgetAPI.on('hook:tool-event', function(event) {
   console.log(event.toolName, event.event);
 });
 ```
@@ -116,40 +116,40 @@ PanelAPI.on('hook:tool-event', function(event) {
 }
 ```
 
-#### `PanelAPI.getTheme()`
+#### `WidgetAPI.getTheme()`
 
 Returns the current UI theme as a plain object.
 
 ```js
-var theme = PanelAPI.getTheme();
+var theme = WidgetAPI.getTheme();
 // { background, backgroundSecondary, textPrimary, textMuted,
 //   accent, fontUi, fontMono }
 ```
 
-#### `PanelAPI.setTitle(title)`
+#### `WidgetAPI.setTitle(title)`
 
 Updates the panel's header title text.
 
 ```js
-PanelAPI.setTitle('My Plugin (3)');
+WidgetAPI.setTitle('My Widget (3)');
 ```
 
-#### `PanelAPI.setHeight(px)`
+#### `WidgetAPI.setHeight(px)`
 
-Resizes the plugin iframe to the given pixel height.
+Resizes the widget iframe to the given pixel height.
 
 ```js
-PanelAPI.setHeight(200);
+WidgetAPI.setHeight(200);
 ```
 
-#### `PanelAPI.emit(eventType, payload)`
+#### `WidgetAPI.emit(eventType, payload)`
 
-Broadcasts a custom event to all other loaded plugin iframes. The receiving
-plugin must subscribe with `PanelAPI.on(eventType, ...)`. No manifest
+Broadcasts a custom event to all other loaded widget iframes. The receiving
+widget must subscribe with `WidgetAPI.on(eventType, ...)`. No manifest
 declaration required; no approval needed. Events do not leave the renderer.
 
 ```js
-PanelAPI.emit('my-plugin:update', { count: 42 });
+WidgetAPI.emit('my-widget:update', { count: 42 });
 ```
 
 ### Write methods (require `capabilities` declaration + user approval)
@@ -162,48 +162,48 @@ If the user denies, the promise rejects with `Error('Permission denied')`.
 If the capability is not declared in the manifest, the promise rejects
 immediately with an error.
 
-#### `PanelAPI.sendTerminalInput(text)` → `Promise<void>`
+#### `WidgetAPI.sendTerminalInput(text)` → `Promise<void>`
 
 Requires `"terminal:write"` capability.
 
 Sends raw text to the terminal PTY, exactly as if the user typed it.
 
 ```js
-PanelAPI.sendTerminalInput('ls -la\n').then(function() {
+WidgetAPI.sendTerminalInput('ls -la\n').then(function() {
   console.log('sent');
 });
 ```
 
-#### `PanelAPI.sendClaudeMessage(text)` → `Promise<void>`
+#### `WidgetAPI.sendClaudeMessage(text)` → `Promise<void>`
 
 Requires `"claude:message"` capability.
 
 Sends `text + newline` to the terminal, submitting it as a message to Claude.
 
 ```js
-PanelAPI.sendClaudeMessage('Summarise the last tool output.');
+WidgetAPI.sendClaudeMessage('Summarise the last tool output.');
 ```
 
-#### `PanelAPI.spawnProcess(cmd, args?)` → `Promise<{ stdout, stderr, exitCode }>`
+#### `WidgetAPI.spawnProcess(cmd, args?)` → `Promise<{ stdout, stderr, exitCode }>`
 
 Requires `"process:spawn"` capability.
 
 Spawns a child process and resolves with combined output. Timeout: 10 seconds.
 
 ```js
-PanelAPI.spawnProcess('git', ['log', '--oneline', '-5']).then(function(r) {
+WidgetAPI.spawnProcess('git', ['log', '--oneline', '-5']).then(function(r) {
   console.log(r.stdout);
 });
 ```
 
-#### `PanelAPI.httpRequest(url, options?)` → `Promise<{ status, body }>`
+#### `WidgetAPI.httpRequest(url, options?)` → `Promise<{ status, body }>`
 
 Requires `"http:request"` capability.
 
 Makes an HTTP or HTTPS request. `body` is the raw response string.
 
 ```js
-PanelAPI.httpRequest('https://api.example.com/data', {
+WidgetAPI.httpRequest('https://api.example.com/data', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({ key: 'value' }),
@@ -216,39 +216,39 @@ PanelAPI.httpRequest('https://api.example.com/data', {
 
 ## Approval flow
 
-When a plugin calls a write method for the first time:
+When a widget calls a write method for the first time:
 
 1. An approval card appears in the **Permissions** sidebar panel.
-2. The card shows the plugin name and the capability being requested.
+2. The card shows the widget name and the capability being requested.
 3. The promise is held until the user responds.
 
 | Button | Behaviour |
 |---|---|
-| **Allow** | Executes the operation. Persists the grant — the plugin will not be prompted again after restart. |
-| **Session** | Executes the operation. Grant is in-memory only — the plugin will be prompted again after restart. |
-| **Deny** | Rejects the promise with `Error('Permission denied')`. The plugin will be prompted again next time it tries. |
+| **Allow** | Executes the operation. Persists the grant — the widget will not be prompted again after restart. |
+| **Session** | Executes the operation. Grant is in-memory only — the widget will be prompted again after restart. |
+| **Deny** | Rejects the promise with `Error('Permission denied')`. The widget will be prompted again next time it tries. |
 
-Grants are stored per-plugin per-capability in `folder-settings.json` under
+Grants are stored per-widget per-capability in `folder-settings.json` under
 the current working directory key.
 
 ---
 
 ## Sandbox constraints
 
-Plugin code runs in a `sandbox="allow-scripts"` iframe with no access to:
+Widget code runs in a `sandbox="allow-scripts"` iframe with no access to:
 - The parent window DOM
 - The filesystem
 - Node.js APIs
 - External URLs via `<script src>` or `<link href>`
 
-All external I/O must go through `PanelAPI` write methods, which require
+All external I/O must go through `WidgetAPI` write methods, which require
 explicit user approval.
 
 ---
 
 ## Step-by-step example
 
-**Goal:** A plugin that shows a button. Clicking it sends `"pwd\n"` to the
+**Goal:** A widget that shows a button. Clicking it sends `"pwd\n"` to the
 terminal to print the current directory.
 
 ### 1. Create the manifest
@@ -275,7 +275,7 @@ terminal to print the current directory.
 
   btn.addEventListener('click', function () {
     btn.disabled = true;
-    window.PanelAPI.sendTerminalInput('pwd\n')
+    window.WidgetAPI.sendTerminalInput('pwd\n')
       .then(function () { btn.disabled = false; })
       .catch(function (err) {
         btn.textContent = err.message;
@@ -287,13 +287,13 @@ terminal to print the current directory.
 
 ### 3. Install
 
-Copy the folder to `<userData>/plugins/panels/pwd-button/` and restart the app.
+Copy the folder to `<userData>/widgets/pwd-button/` and restart the app.
 
 ### 4. First run
 
 Click the button. An approval card appears in the Permissions panel:
 
-> **PWD** · plugin  
+> **PWD** · widget  
 > Requesting: Write to terminal  
 > [Allow] [Session] [Deny]
 

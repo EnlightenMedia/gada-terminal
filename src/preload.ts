@@ -45,22 +45,22 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // File drag-and-drop path extraction (File.path unavailable with context isolation)
   getPathForFile: (file: File) => webUtils.getPathForFile(file),
 
-  // Panel plugin loading
-  getPluginDescriptors: () => ipcRenderer.invoke('plugins:get-descriptors'),
+  // Widget loading
+  getWidgetDescriptors: () => ipcRenderer.invoke('widgets:get-descriptors'),
 
-  // Plugin capability approval
-  pluginCapabilityRequest: (pluginId: string, capability: string, args: unknown[]) =>
-    ipcRenderer.invoke('plugin:capability-request', pluginId, capability, args),
-  pluginCapabilityDecide: (id: string, decision: string) =>
-    ipcRenderer.invoke('plugin:capability-decide', id, decision),
-  onPluginCapabilityRequest: (callback: (req: unknown) => void) =>
-    ipcRenderer.on('hook:plugin-capability-request', (_, req) => callback(req)),
+  // Widget capability approval
+  widgetCapabilityRequest: (widgetId: string, capability: string, args: unknown[]) =>
+    ipcRenderer.invoke('widget:capability-request', widgetId, capability, args),
+  widgetCapabilityDecide: (id: string, decision: string) =>
+    ipcRenderer.invoke('widget:capability-decide', id, decision),
+  onWidgetCapabilityRequest: (callback: (req: unknown) => void) =>
+    ipcRenderer.on('hook:widget-capability-request', (_, req) => callback(req)),
 
-  // Plugin management
-  setPluginDisabled: (pluginId: string, disabled: boolean) =>
-    ipcRenderer.send('plugin:set-disabled', pluginId, disabled),
-  revokePluginGrant: (pluginId: string, capability: string) =>
-    ipcRenderer.send('plugin:revoke-grant', pluginId, capability),
+  // Widget management
+  setWidgetDisabled: (widgetId: string, disabled: boolean) =>
+    ipcRenderer.send('widget:set-disabled', widgetId, disabled),
+  revokeWidgetGrant: (widgetId: string, capability: string) =>
+    ipcRenderer.send('widget:revoke-grant', widgetId, capability),
 
   // Claude Code plugin dirs (launch screen)
   pickPluginDir: () => ipcRenderer.invoke('plugins:pick-dir'),

@@ -23,21 +23,21 @@ import {
 import type { FolderSettings, LaunchOptions } from './persistence';
 import { startHookServer } from './hookServer';
 import { buildSettingsArgs } from './settingsBuilder';
-import type { ToolEvent, ApiRequestEvent, PermissionRequest, PermissionDecision, PluginDescriptor, PluginCapabilityRequest } from './types';
+import type { ToolEvent, ApiRequestEvent, PermissionRequest, PermissionDecision, WidgetDescriptor, WidgetCapabilityRequest } from './types';
 
 declare const MAIN_WINDOW_VITE_DEV_SERVER_URL: string;
 declare const MAIN_WINDOW_VITE_NAME: string;
 
 let mainWindow: BrowserWindow | null = null;
-let plugins: PluginDescriptor[] = [];
+let widgets: WidgetDescriptor[] = [];
 
-function loadPlugins(userDataPath: string): PluginDescriptor[] {
+function loadWidgets(userDataPath: string): WidgetDescriptor[] {
   const scanDirs = [
-    path.join(userDataPath, 'plugins', 'panels'),
-    path.join(app.getAppPath(), 'plugins'),
+    path.join(userDataPath, 'widgets'),
+    path.join(app.getAppPath(), 'widgets'),
   ];
 
-  const descriptors: PluginDescriptor[] = [];
+  const descriptors: WidgetDescriptor[] = [];
   const seen = new Set<string>();
 
   for (const scanDir of scanDirs) {
@@ -46,10 +46,10 @@ function loadPlugins(userDataPath: string): PluginDescriptor[] {
     try { entries = readdirSync(scanDir); } catch { continue; }
 
     for (const entry of entries) {
-      const pluginDir = path.join(scanDir, entry);
-      try { if (!statSync(pluginDir).isDirectory()) continue; } catch { continue; }
+      const widgetDir = path.join(scanDir, entry);
+      try { if (!statSync(widgetDir).isDirectory()) continue; } catch { continue; }
 
-      const manifestPath = path.join(pluginDir, 'panel-plugin.json');
+      const manifestPath = path.join(widgetDir, 'widget.json');
       if (!existsSync(manifestPath)) continue;
 
       try {
@@ -58,7 +58,7 @@ function loadPlugins(userDataPath: string): PluginDescriptor[] {
         if (!id || typeof id !== 'string' || !entryFile || typeof entryFile !== 'string') continue;
         if (seen.has(id)) continue;
 
-        const entryPath = path.join(pluginDir, entryFile);
+        const entryPath = path.join(widgetDir, entryFile);
         if (!existsSync(entryPath)) continue;
 
         seen.add(id);
@@ -70,7 +70,7 @@ function loadPlugins(userDataPath: string): PluginDescriptor[] {
           capabilities: Array.isArray(capabilities) ? capabilities : [],
           entrySource: readFileSync(entryPath, 'utf-8'),
         });
-      } catch { /* skip invalid plugins silently */ }
+      } catch { /* skip invalid widgets silently */ }
     }
   }
 
@@ -90,14 +90,14 @@ let hookDecidePermission: ((id: string, decision: PermissionDecision) => void) |
 const sessionAllowedTools = new Set<string>();
 const pendingToolNames = new Map<string, string>(); // id → toolName
 
-// Plugin capability grants
-// sessionGranted: pluginId → Set<capability>  (in-memory, cleared on restart)
-// sessionDenied:  pluginId → Set<capability>  (in-memory, cleared on restart)
+// Widget capability grants
+// sessionGranted: widgetId → Set<capability>  (in-memory, cleared on restart)
+// sessionDenied:  widgetId → Set<capability>  (in-memory, cleared on restart)
 const sessionGrantedCapabilities = new Map<string, Set<string>>();
 const sessionDeniedCapabilities = new Map<string, Set<string>>();
 
 type PendingCapabilityEntry = {
-  pluginId: string;
+  widgetId: string;
   capability: string;
   args: unknown[];
   resolve: (value: { ok: boolean; result?: unknown; error?: string }) => void;
@@ -190,7 +190,7 @@ function clampBoundsToScreens(
 
 async function createWindow(): Promise<void> {
   userDataPath = app.getPath('userData');
-  plugins = loadPlugins(userDataPath);
+  widgets = loadWidgets(userDataPath);
 
   // Start hook server before showing the window so hookPort is ready for spawn
   const hookServer = await startHookServer(
@@ -364,8 +364,10 @@ ipcMain.handle('permission:decide', (_, id: string, decision: PermissionDecision
   hookDecidePermission?.(id, decision);
 });
 
-// Plugins
-ipcMain.handle('plugins:get-descriptors', () => plugins);
+// Widgets
+ipcMain.handle('widgets:get-descriptors', () => widgets);
+
+// Claude Code plugin dirs (launch screen — these remain "plugins" as they reference the Claude CLI flag)
 ipcMain.handle('plugins:pick-dir', async () => {
   if (!mainWindow) return null;
   const result = await dialog.showOpenDialog(mainWindow, { properties: ['openDirectory'] });
@@ -374,19 +376,19 @@ ipcMain.handle('plugins:pick-dir', async () => {
 ipcMain.handle('plugins:get-recent', () => getRecentPlugins(userDataPath));
 ipcMain.on('plugins:add-recent', (_, dirs: string[]) => addRecentPlugins(userDataPath, dirs));
 
-// Plugin capability helpers
+// Widget capability helpers
 
-function isCapabilityGranted(pluginId: string, capability: string): boolean {
-  if (sessionGrantedCapabilities.get(pluginId)?.has(capability)) return true;
+function isCapabilityGranted(widgetId: string, capability: string): boolean {
+  if (sessionGrantedCapabilities.get(widgetId)?.has(capability)) return true;
   if (currentFolder) {
-    const grants = getFolderSettings(userDataPath, currentFolder).pluginGrants ?? {};
-    if (grants[pluginId]?.includes(capability)) return true;
+    const grants = getFolderSettings(userDataPath, currentFolder).widgetGrants ?? {};
+    if (grants[widgetId]?.includes(capability)) return true;
   }
   return false;
 }
 
-function isCapabilityDenied(pluginId: string, capability: string): boolean {
-  return sessionDeniedCapabilities.get(pluginId)?.has(capability) ?? false;
+function isCapabilityDenied(widgetId: string, capability: string): boolean {
+  return sessionDeniedCapabilities.get(widgetId)?.has(capability) ?? false;
 }
 
 function executeCapability(capability: string, args: unknown[]): Promise<{ ok: boolean; result?: unknown; error?: string }> {
@@ -440,90 +442,87 @@ function executeCapability(capability: string, args: unknown[]): Promise<{ ok: b
   });
 }
 
-ipcMain.handle('plugin:capability-request', async (_, pluginId: string, capability: string, args: unknown[]): Promise<{ ok: boolean; result?: unknown; error?: string }> => {
-  // Find the plugin to get its name and validate declared capabilities
-  const plugin = plugins.find(p => p.id === pluginId);
-  if (!plugin) return { ok: false, error: 'Unknown plugin' };
-  if (!plugin.capabilities.includes(capability)) {
+ipcMain.handle('widget:capability-request', async (_, widgetId: string, capability: string, args: unknown[]): Promise<{ ok: boolean; result?: unknown; error?: string }> => {
+  const widget = widgets.find(w => w.id === widgetId);
+  if (!widget) return { ok: false, error: 'Unknown widget' };
+  if (!widget.capabilities.includes(capability)) {
     return { ok: false, error: `Capability '${capability}' not declared in manifest` };
   }
 
-  if (isCapabilityDenied(pluginId, capability)) {
+  if (isCapabilityDenied(widgetId, capability)) {
     return { ok: false, error: 'Permission denied' };
   }
 
-  if (isCapabilityGranted(pluginId, capability)) {
+  if (isCapabilityGranted(widgetId, capability)) {
     return executeCapability(capability, args);
   }
 
   // Not yet decided — emit approval request to renderer and hold the response
-  const approvalId = `${pluginId}:${capability}:${Date.now()}:${Math.random().toString(36).slice(2)}`;
-  const req: PluginCapabilityRequest = {
+  const approvalId = `${widgetId}:${capability}:${Date.now()}:${Math.random().toString(36).slice(2)}`;
+  const req: WidgetCapabilityRequest = {
     id: approvalId,
-    pluginId,
-    pluginName: plugin.name,
+    widgetId,
+    widgetName: widget.name,
     capability,
     timestamp: Date.now(),
   };
 
   return new Promise(resolve => {
-    pendingCapabilities.set(approvalId, { pluginId, capability, args, resolve });
+    pendingCapabilities.set(approvalId, { widgetId, capability, args, resolve });
     if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send('hook:plugin-capability-request', req);
+      mainWindow.webContents.send('hook:widget-capability-request', req);
     }
   });
 });
 
-ipcMain.handle('plugin:capability-decide', async (_, approvalId: string, decision: 'allow' | 'allow-session' | 'deny') => {
+ipcMain.handle('widget:capability-decide', async (_, approvalId: string, decision: 'allow' | 'allow-session' | 'deny') => {
   const entry = pendingCapabilities.get(approvalId);
   if (!entry) return;
   pendingCapabilities.delete(approvalId);
 
-  const { pluginId, capability, args, resolve } = entry;
+  const { widgetId, capability, args, resolve } = entry;
 
   if (decision === 'allow') {
-    // Persist grant to folder settings
     if (currentFolder) {
       const settings = getFolderSettings(userDataPath, currentFolder);
-      const grants = { ...(settings.pluginGrants ?? {}) };
-      if (!grants[pluginId]) grants[pluginId] = [];
-      if (!grants[pluginId].includes(capability)) grants[pluginId] = [...grants[pluginId], capability];
-      saveFolderSetting(userDataPath, currentFolder, 'pluginGrants', grants);
+      const grants = { ...(settings.widgetGrants ?? {}) };
+      if (!grants[widgetId]) grants[widgetId] = [];
+      if (!grants[widgetId].includes(capability)) grants[widgetId] = [...grants[widgetId], capability];
+      saveFolderSetting(userDataPath, currentFolder, 'widgetGrants', grants);
     }
     resolve(await executeCapability(capability, args));
   } else if (decision === 'allow-session') {
-    if (!sessionGrantedCapabilities.has(pluginId)) sessionGrantedCapabilities.set(pluginId, new Set());
-    sessionGrantedCapabilities.get(pluginId)!.add(capability);
+    if (!sessionGrantedCapabilities.has(widgetId)) sessionGrantedCapabilities.set(widgetId, new Set());
+    sessionGrantedCapabilities.get(widgetId)!.add(capability);
     resolve(await executeCapability(capability, args));
   } else {
-    if (!sessionDeniedCapabilities.has(pluginId)) sessionDeniedCapabilities.set(pluginId, new Set());
-    sessionDeniedCapabilities.get(pluginId)!.add(capability);
+    if (!sessionDeniedCapabilities.has(widgetId)) sessionDeniedCapabilities.set(widgetId, new Set());
+    sessionDeniedCapabilities.get(widgetId)!.add(capability);
     resolve({ ok: false, error: 'Permission denied' });
   }
 });
 
-// Plugin management
-ipcMain.on('plugin:set-disabled', (_, pluginId: string, disabled: boolean) => {
+// Widget management
+ipcMain.on('widget:set-disabled', (_, widgetId: string, disabled: boolean) => {
   if (!currentFolder) return;
   const settings = getFolderSettings(userDataPath, currentFolder);
-  const current = new Set(settings.disabledPlugins ?? []);
-  if (disabled) current.add(pluginId);
-  else current.delete(pluginId);
-  saveFolderSetting(userDataPath, currentFolder, 'disabledPlugins', [...current]);
+  const current = new Set(settings.disabledWidgets ?? []);
+  if (disabled) current.add(widgetId);
+  else current.delete(widgetId);
+  saveFolderSetting(userDataPath, currentFolder, 'disabledWidgets', [...current]);
 });
 
-ipcMain.on('plugin:revoke-grant', (_, pluginId: string, capability: string) => {
+ipcMain.on('widget:revoke-grant', (_, widgetId: string, capability: string) => {
   if (currentFolder) {
     const settings = getFolderSettings(userDataPath, currentFolder);
-    const grants = { ...(settings.pluginGrants ?? {}) };
-    if (grants[pluginId]) {
-      grants[pluginId] = grants[pluginId].filter(c => c !== capability);
-      if (grants[pluginId].length === 0) delete grants[pluginId];
-      saveFolderSetting(userDataPath, currentFolder, 'pluginGrants', grants);
+    const grants = { ...(settings.widgetGrants ?? {}) };
+    if (grants[widgetId]) {
+      grants[widgetId] = grants[widgetId].filter(c => c !== capability);
+      if (grants[widgetId].length === 0) delete grants[widgetId];
+      saveFolderSetting(userDataPath, currentFolder, 'widgetGrants', grants);
     }
   }
-  // Also clear any in-memory session grant
-  sessionGrantedCapabilities.get(pluginId)?.delete(capability);
+  sessionGrantedCapabilities.get(widgetId)?.delete(capability);
 });
 
 // Clipboard

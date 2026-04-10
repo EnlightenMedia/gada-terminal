@@ -21,7 +21,7 @@
   writeBtn.addEventListener('click', function () {
     writeBtn.disabled = true;
     writeBtn.textContent = 'Waiting…';
-    window.PanelAPI.sendTerminalInput('hello').then(function () {
+    window.WidgetAPI.sendTerminalInput('hello').then(function () {
       writeBtn.textContent = 'Sent!';
       setTimeout(function () {
         writeBtn.disabled = false;
@@ -39,9 +39,9 @@
   });
   document.body.appendChild(writeBtn);
 
-  window.PanelAPI.setTitle('Tool Count');
+  window.WidgetAPI.setTitle('Tool Count');
 
-  window.PanelAPI.on('hook:tool-event', function (event) {
+  window.WidgetAPI.on('hook:tool-event', function (event) {
     if (event.event !== 'PreToolUse') return;
     counts[event.toolName] = (counts[event.toolName] || 0) + 1;
     render();

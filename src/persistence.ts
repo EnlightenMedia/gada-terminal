@@ -16,8 +16,8 @@ export interface FolderSettings {
   sidebarWidth?: number;
   launchOptions?: LaunchOptions;
   enabledPlugins?: string[];
-  disabledPlugins?: string[];             // pluginIds that are disabled; absent = all enabled
-  pluginGrants?: Record<string, string[]>; // pluginId → permanently granted capabilities
+  disabledWidgets?: string[];             // widgetIds that are disabled; absent = all enabled
+  widgetGrants?: Record<string, string[]>; // widgetId → permanently granted capabilities
 }
 
 export interface GlobalSettings {

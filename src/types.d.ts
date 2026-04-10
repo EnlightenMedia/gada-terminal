@@ -2,7 +2,7 @@ import type { LaunchOptions, FolderSettings } from './persistence';
 
 export type { LaunchOptions, FolderSettings };
 
-export interface PluginDescriptor {
+export interface WidgetDescriptor {
   id: string;
   name: string;
   version: string;
@@ -11,10 +11,10 @@ export interface PluginDescriptor {
   entrySource: string;
 }
 
-export interface PluginCapabilityRequest {
+export interface WidgetCapabilityRequest {
   id: string;
-  pluginId: string;
-  pluginName: string;
+  widgetId: string;
+  widgetName: string;
   capability: string;
   timestamp: number;
 }
@@ -86,17 +86,17 @@ declare global {
       // File drag-and-drop (requires webUtils, not available via standard File.path with context isolation)
       getPathForFile: (file: File) => string;
 
-      // Panel plugin loading
-      getPluginDescriptors: () => Promise<PluginDescriptor[]>;
+      // Widget loading
+      getWidgetDescriptors: () => Promise<WidgetDescriptor[]>;
 
-      // Plugin capability approval
-      pluginCapabilityRequest: (pluginId: string, capability: string, args: unknown[]) => Promise<{ ok: boolean; result?: unknown; error?: string }>;
-      pluginCapabilityDecide: (id: string, decision: 'allow' | 'allow-session' | 'deny') => Promise<void>;
-      onPluginCapabilityRequest: (callback: (req: PluginCapabilityRequest) => void) => void;
+      // Widget capability approval
+      widgetCapabilityRequest: (widgetId: string, capability: string, args: unknown[]) => Promise<{ ok: boolean; result?: unknown; error?: string }>;
+      widgetCapabilityDecide: (id: string, decision: 'allow' | 'allow-session' | 'deny') => Promise<void>;
+      onWidgetCapabilityRequest: (callback: (req: WidgetCapabilityRequest) => void) => void;
 
-      // Plugin management
-      setPluginDisabled: (pluginId: string, disabled: boolean) => void;
-      revokePluginGrant: (pluginId: string, capability: string) => void;
+      // Widget management
+      setWidgetDisabled: (widgetId: string, disabled: boolean) => void;
+      revokeWidgetGrant: (widgetId: string, capability: string) => void;
 
       // Claude Code plugin dirs (launch screen)
       pickPluginDir: () => Promise<string | null>;

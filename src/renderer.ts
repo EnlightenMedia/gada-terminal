@@ -1,7 +1,7 @@
 import '@xterm/xterm/css/xterm.css';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
-import type { LaunchOptions, FolderSettings, ToolEvent, ApiRequestEvent, PermissionRequest, PermissionDecision, PluginDescriptor, PluginCapabilityRequest } from './types';
+import type { LaunchOptions, FolderSettings, ToolEvent, ApiRequestEvent, PermissionRequest, PermissionDecision, WidgetDescriptor, WidgetCapabilityRequest } from './types';
 
 // ── Terminal setup ────────────────────────────────────────────────────────────
 
@@ -149,10 +149,10 @@ const DEFAULT_HIDDEN = new Set(['permissions', 'cost', 'context']);
 let sectionOrder: string[] = [...ALL_SECTIONS];
 const hiddenSections: Set<string> = new Set(DEFAULT_HIDDEN);
 
-// Plugin panels
-let allDescriptors: PluginDescriptor[] = [];
-const pluginSections: string[] = [];
-const pluginIframes = new Map<string, { iframe: HTMLIFrameElement; permissions: string[]; capabilities: string[] }>();
+// Widget panels
+let allDescriptors: WidgetDescriptor[] = [];
+const widgetSections: string[] = [];
+const widgetIframes = new Map<string, { iframe: HTMLIFrameElement; permissions: string[]; capabilities: string[] }>();
 
 function savePanelLayout(): void {
   window.electronAPI.setPanelLayout(selectedFolder ?? '', {
@@ -235,9 +235,9 @@ document.querySelectorAll<HTMLElement>('.panel-section').forEach(section => {
 
 applyPanelState();
 
-// ── Plugin panels ─────────────────────────────────────────────────────────────
+// ── Widget panels ────────────────────────────────────────────────────────────
 
-function buildSrcdoc(desc: PluginDescriptor): string {
+function buildSrcdoc(desc: WidgetDescriptor): string {
   const escaped = desc.entrySource.replace(/<\/script/gi, '<\\/script');
   const shim = `(function(){
   var _l={},_p={};
@@ -245,16 +245,16 @@ function buildSrcdoc(desc: PluginDescriptor): string {
     return new Promise(function(resolve,reject){
       var reqId=Math.random().toString(36).slice(2)+Date.now();
       _p[reqId]={resolve:resolve,reject:reject};
-      window.parent.postMessage({type:'plugin:capability-request',capability:capability,args:args,reqId:reqId},'*');
+      window.parent.postMessage({type:'widget:capability-request',capability:capability,args:args,reqId:reqId},'*');
     });
   }
-  window.PanelAPI={
+  window.WidgetAPI={
     version:'1',
     on:function(t,cb){if(!_l[t])_l[t]=[];_l[t].push(cb);},
     getTheme:function(){return{background:'#181818',backgroundSecondary:'#212121',textPrimary:'#e0e0e0',textMuted:'#666',accent:'#4ec94e',fontUi:"-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif",fontMono:"'Cascadia Code',Consolas,monospace"};},
     setTitle:function(t){window.parent.postMessage({type:'panel:setTitle',title:t},'*');},
     setHeight:function(px){window.parent.postMessage({type:'panel:setHeight',height:px},'*');},
-    emit:function(eventType,payload){window.parent.postMessage({type:'plugin:emit',eventType:eventType,payload:payload},'*');},
+    emit:function(eventType,payload){window.parent.postMessage({type:'widget:emit',eventType:eventType,payload:payload},'*');},
     sendTerminalInput:function(text){return _req('terminal:write',[text]);},
     sendClaudeMessage:function(text){return _req('claude:message',[text]);},
     spawnProcess:function(cmd,args){return _req('process:spawn',[cmd,args||[]]);},
@@ -263,7 +263,7 @@ function buildSrcdoc(desc: PluginDescriptor): string {
   window.addEventListener('message',function(e){
     if(!e.data||!e.data.type)return;
     var t=String(e.data.type);
-    if(t==='plugin:capability-response'){
+    if(t==='widget:capability-response'){
       var entry=_p[e.data.reqId];
       if(!entry)return;
       delete _p[e.data.reqId];
@@ -273,7 +273,7 @@ function buildSrcdoc(desc: PluginDescriptor): string {
     }
     if(t.indexOf('event:')===0){
       var et=t.slice(6),cbs=_l[et]||[];
-      for(var i=0;i<cbs.length;i++){try{cbs[i](e.data.payload);}catch(err){console.error('[Plugin ${desc.id}]',err);}}
+      for(var i=0;i<cbs.length;i++){try{cbs[i](e.data.payload);}catch(err){console.error('[Widget${desc.id}]',err);}}
     }
   });
 })();`;
@@ -291,7 +291,7 @@ function buildSrcdoc(desc: PluginDescriptor): string {
   ].join('\n');
 }
 
-function createPluginPanels(descriptors: PluginDescriptor[]): void {
+function createWidgetPanels(descriptors: WidgetDescriptor[]): void {
   if (descriptors.length === 0) return;
 
   const toggleBar = document.getElementById('panel-toggle-bar')!;
@@ -299,7 +299,7 @@ function createPluginPanels(descriptors: PluginDescriptor[]): void {
   const newIds: string[] = [];
 
   for (const desc of descriptors) {
-    pluginSections.push(desc.id);
+    widgetSections.push(desc.id);
     newIds.push(desc.id);
 
     // Toggle button
@@ -339,9 +339,9 @@ function createPluginPanels(descriptors: PluginDescriptor[]): void {
     section.appendChild(body);
     sectionsContainer.appendChild(section);
 
-    pluginIframes.set(desc.id, { iframe, permissions: desc.permissions, capabilities: desc.capabilities });
+    widgetIframes.set(desc.id, { iframe, permissions: desc.permissions, capabilities: desc.capabilities });
 
-    // Handle postMessages from this plugin
+    // Handle postMessages from this widget
     window.addEventListener('message', (e: MessageEvent) => {
       if (e.source !== iframe.contentWindow) return;
       if (!e.data || !e.data.type) return;
@@ -350,9 +350,9 @@ function createPluginPanels(descriptors: PluginDescriptor[]): void {
         title.textContent = String(e.data.title ?? desc.name);
       } else if (msgType === 'panel:setHeight' && typeof e.data.height === 'number') {
         iframe.style.height = `${e.data.height}px`;
-      } else if (msgType === 'plugin:emit') {
-        // Broadcast to all other plugin iframes
-        for (const [otherId, { iframe: other }] of pluginIframes) {
+      } else if (msgType === 'widget:emit') {
+        // Broadcast to all other widget iframes
+        for (const [otherId, { iframe: other }] of widgetIframes) {
           if (otherId !== desc.id) {
             other.contentWindow?.postMessage({
               type: `event:${e.data.eventType}`,
@@ -360,12 +360,12 @@ function createPluginPanels(descriptors: PluginDescriptor[]): void {
             }, '*');
           }
         }
-      } else if (msgType === 'plugin:capability-request') {
+      } else if (msgType === 'widget:capability-request') {
         const reqId: string = e.data.reqId;
         const capability: string = e.data.capability;
         const args: unknown[] = Array.isArray(e.data.args) ? e.data.args : [];
-        window.electronAPI.pluginCapabilityRequest(desc.id, capability, args).then(result => {
-          iframe.contentWindow?.postMessage({ type: 'plugin:capability-response', reqId, ...result }, '*');
+        window.electronAPI.widgetCapabilityRequest(desc.id, capability, args).then(result => {
+          iframe.contentWindow?.postMessage({ type: 'widget:capability-response', reqId, ...result }, '*');
         });
       }
     });
@@ -374,8 +374,10 @@ function createPluginPanels(descriptors: PluginDescriptor[]): void {
   sectionOrder = [...sectionOrder, ...newIds];
 }
 
-function forwardToPlugins(eventType: string, payload: unknown): void {
-  for (const [, { iframe, permissions }] of pluginIframes) {
+
+
+function forwardToWidgets(eventType: string, payload: unknown): void {
+  for (const [, { iframe, permissions }] of widgetIframes) {
     if (permissions.includes(eventType)) {
       iframe.contentWindow?.postMessage({ type: `event:${eventType}`, payload }, '*');
     }
@@ -503,7 +505,7 @@ window.electronAPI.onToolEvent((event: ToolEvent) => {
     const card = toolCardMap.get(event.id);
     if (card) updateToolCard(card, event);
   }
-  forwardToPlugins('hook:tool-event', event);
+  forwardToWidgets('hook:tool-event', event);
 });
 
 // ── Permission cards ──────────────────────────────────────────────────────────
@@ -659,7 +661,7 @@ window.electronAPI.onPermissionRequest((req: PermissionRequest) => {
   permFeed.prepend(card);
 });
 
-// ── Plugin capability approval cards ─────────────────────────────────────────
+// ── Widget capability approval cards ─────────────────────────────────────────
 
 const CAPABILITY_LABELS: Record<string, string> = {
   'terminal:write': 'Write to terminal',
@@ -668,7 +670,7 @@ const CAPABILITY_LABELS: Record<string, string> = {
   'http:request': 'Make HTTP requests',
 };
 
-function createPluginCapabilityCard(req: PluginCapabilityRequest): HTMLElement {
+function createWidgetCapabilityCard(req: WidgetCapabilityRequest): HTMLElement {
   const card = document.createElement('div');
   card.className = 'perm-card';
 
@@ -681,11 +683,11 @@ function createPluginCapabilityCard(req: PluginCapabilityRequest): HTMLElement {
 
   const name = document.createElement('span');
   name.className = 'perm-card-name';
-  name.textContent = req.pluginName;
+  name.textContent = req.widgetName;
 
   const badge = document.createElement('span');
   badge.className = 'perm-badge pending';
-  badge.textContent = 'plugin';
+  badge.textContent = 'widget';
 
   header.appendChild(time);
   header.appendChild(name);
@@ -702,11 +704,11 @@ function createPluginCapabilityCard(req: PluginCapabilityRequest): HTMLElement {
     card.remove();
     // Reuse history entry pattern with pluginName as the "tool"
     addPermHistory(
-      { id: req.id, toolName: `${req.pluginName} · ${req.capability}`, input: {}, timestamp: req.timestamp },
+      { id: req.id, toolName: `${req.widgetName} · ${req.capability}`, input: {}, timestamp: req.timestamp },
       label,
       badgeClass
     );
-    window.electronAPI.pluginCapabilityDecide(req.id, decision);
+    window.electronAPI.widgetCapabilityDecide(req.id, decision);
   }
 
   const btnAllow = document.createElement('button');
@@ -735,9 +737,9 @@ function createPluginCapabilityCard(req: PluginCapabilityRequest): HTMLElement {
   return card;
 }
 
-window.electronAPI.onPluginCapabilityRequest((req: PluginCapabilityRequest) => {
+window.electronAPI.onWidgetCapabilityRequest((req: WidgetCapabilityRequest) => {
   showPermissionsSection();
-  const card = createPluginCapabilityCard(req);
+  const card = createWidgetCapabilityCard(req);
   permFeed.prepend(card);
 });
 
@@ -871,16 +873,16 @@ function updateContextPanel(event: ApiRequestEvent): void {
 window.electronAPI.onApiRequest((event: ApiRequestEvent) => {
   updateCostPanel(event);
   updateContextPanel(event);
-  forwardToPlugins('hook:api-request', event);
+  forwardToWidgets('hook:api-request', event);
 });
 
-// ── Plugin management overlay ─────────────────────────────────────────────────
+// ── Widget management overlay ─────────────────────────────────────────────────
 
-const pluginMgmtOverlay = document.getElementById('plugin-mgmt-overlay') as HTMLElement;
-const pluginMgmtList = document.getElementById('plugin-mgmt-list') as HTMLElement;
+const widgetMgmtOverlay = document.getElementById('widget-mgmt-overlay') as HTMLElement;
+const widgetMgmtList = document.getElementById('widget-mgmt-list') as HTMLElement;
 const panelSections = document.getElementById('panel-sections') as HTMLElement;
-const btnPluginSettings = document.getElementById('btn-plugin-settings') as HTMLButtonElement;
-const btnPluginMgmtClose = document.getElementById('btn-plugin-mgmt-close') as HTMLButtonElement;
+const btnWidgetSettings = document.getElementById('btn-widget-settings') as HTMLButtonElement;
+const btnWidgetMgmtClose = document.getElementById('btn-widget-mgmt-close') as HTMLButtonElement;
 
 const CAPABILITY_LABELS_MGMT: Record<string, string> = {
   'terminal:write': 'terminal:write',
@@ -889,96 +891,96 @@ const CAPABILITY_LABELS_MGMT: Record<string, string> = {
   'http:request': 'http:request',
 };
 
-async function openPluginMgmt(): Promise<void> {
+async function openWidgetMgmt(): Promise<void> {
   // Always fetch fresh settings so in-session grants are visible
   if (selectedFolder) {
     allFolderSettings[selectedFolder] = await window.electronAPI.getFolderSettings(selectedFolder);
   }
-  renderPluginMgmt();
+  renderWidgetMgmt();
   panelSections.style.display = 'none';
-  pluginMgmtOverlay.classList.remove('hidden');
-  btnPluginSettings.classList.add('active');
+  widgetMgmtOverlay.classList.remove('hidden');
+  btnWidgetSettings.classList.add('active');
 }
 
-function closePluginMgmt(): void {
-  pluginMgmtOverlay.classList.add('hidden');
+function closeWidgetMgmt(): void {
+  widgetMgmtOverlay.classList.add('hidden');
   panelSections.style.display = '';
-  btnPluginSettings.classList.remove('active');
+  btnWidgetSettings.classList.remove('active');
 }
 
-function renderPluginMgmt(): void {
-  pluginMgmtList.innerHTML = '';
+function renderWidgetMgmt(): void {
+  widgetMgmtList.innerHTML = '';
 
   if (allDescriptors.length === 0) {
     const empty = document.createElement('div');
-    empty.className = 'plugin-mgmt-empty';
-    empty.textContent = 'No plugins installed.';
-    pluginMgmtList.appendChild(empty);
+    empty.className = 'widget-mgmt-empty';
+    empty.textContent = 'No widgets installed.';
+    widgetMgmtList.appendChild(empty);
     return;
   }
 
   const folderKey = selectedFolder ?? '';
   const folderSettings = allFolderSettings[folderKey] ?? {};
-  const disabledSet = new Set(folderSettings.disabledPlugins ?? []);
-  const grants = folderSettings.pluginGrants ?? {};
+  const disabledSet = new Set(folderSettings.disabledWidgets ?? []);
+  const grants = folderSettings.widgetGrants ?? {};
 
   for (const desc of allDescriptors) {
     const isDisabled = disabledSet.has(desc.id);
 
     const row = document.createElement('div');
-    row.className = 'plugin-mgmt-row' + (isDisabled ? ' disabled' : '');
+    row.className = 'widget-mgmt-row' + (isDisabled ? ' disabled' : '');
 
     // Header: name, version, toggle
     const header = document.createElement('div');
-    header.className = 'plugin-mgmt-row-header';
+    header.className = 'widget-mgmt-row-header';
 
     const nameEl = document.createElement('span');
-    nameEl.className = 'plugin-mgmt-name';
+    nameEl.className = 'widget-mgmt-name';
     nameEl.textContent = desc.name;
 
     const versionEl = document.createElement('span');
-    versionEl.className = 'plugin-mgmt-version';
+    versionEl.className = 'widget-mgmt-version';
     versionEl.textContent = `v${desc.version}`;
 
     const toggleLabel = document.createElement('label');
-    toggleLabel.className = 'plugin-toggle';
-    toggleLabel.title = isDisabled ? 'Enable plugin' : 'Disable plugin';
+    toggleLabel.className = 'widget-toggle';
+    toggleLabel.title = isDisabled ? 'Enable widget' : 'Disable widget';
 
     const toggleInput = document.createElement('input');
     toggleInput.type = 'checkbox';
     toggleInput.checked = !isDisabled;
 
     const toggleSlider = document.createElement('span');
-    toggleSlider.className = 'plugin-toggle-slider';
+    toggleSlider.className = 'widget-toggle-slider';
     toggleLabel.appendChild(toggleInput);
     toggleLabel.appendChild(toggleSlider);
 
     toggleInput.addEventListener('change', () => {
       const nowDisabled = !toggleInput.checked;
       row.classList.toggle('disabled', nowDisabled);
-      toggleLabel.title = nowDisabled ? 'Enable plugin' : 'Disable plugin';
+      toggleLabel.title = nowDisabled ? 'Enable widget' : 'Disable widget';
 
       // Persist
-      const current = new Set(allFolderSettings[folderKey]?.disabledPlugins ?? []);
+      const current = new Set(allFolderSettings[folderKey]?.disabledWidgets ?? []);
       if (nowDisabled) current.add(desc.id);
       else current.delete(desc.id);
       if (!allFolderSettings[folderKey]) allFolderSettings[folderKey] = {};
-      allFolderSettings[folderKey].disabledPlugins = [...current];
-      window.electronAPI.setPluginDisabled(desc.id, nowDisabled);
+      allFolderSettings[folderKey].disabledWidgets = [...current];
+      window.electronAPI.setWidgetDisabled(desc.id, nowDisabled);
 
-      if (nowDisabled && pluginIframes.has(desc.id)) {
+      if (nowDisabled && widgetIframes.has(desc.id)) {
         // Remove panel from DOM immediately
         document.getElementById(`section-${desc.id}`)?.remove();
         document.querySelector<HTMLButtonElement>(`.panel-toggle-btn[data-section="${desc.id}"]`)?.remove();
         const idx = sectionOrder.indexOf(desc.id);
         if (idx >= 0) sectionOrder.splice(idx, 1);
-        const pIdx = pluginSections.indexOf(desc.id);
-        if (pIdx >= 0) pluginSections.splice(pIdx, 1);
-        pluginIframes.delete(desc.id);
+        const pIdx = widgetSections.indexOf(desc.id);
+        if (pIdx >= 0) widgetSections.splice(pIdx, 1);
+        widgetIframes.delete(desc.id);
         savePanelLayout();
-      } else if (!nowDisabled && !pluginIframes.has(desc.id)) {
+      } else if (!nowDisabled && !widgetIframes.has(desc.id)) {
         // Re-enable: inject panel immediately, no restart required
-        createPluginPanels([desc]);
+        createWidgetPanels([desc]);
         applyPanelState();
       }
     });
@@ -989,37 +991,37 @@ function renderPluginMgmt(): void {
     row.appendChild(header);
 
     // Granted capabilities
-    const pluginGrants = grants[desc.id] ?? [];
-    if (pluginGrants.length > 0) {
+    const widgetGrants = grants[desc.id] ?? [];
+    if (widgetGrants.length > 0) {
       const grantsEl = document.createElement('div');
-      grantsEl.className = 'plugin-grants';
+      grantsEl.className = 'widget-grants';
 
       const grantsLabel = document.createElement('div');
-      grantsLabel.className = 'plugin-grants-label';
+      grantsLabel.className = 'widget-grants-label';
       grantsLabel.textContent = 'Granted';
       grantsEl.appendChild(grantsLabel);
 
-      for (const cap of pluginGrants) {
+      for (const cap of widgetGrants) {
         const grantRow = document.createElement('div');
-        grantRow.className = 'plugin-grant-row';
+        grantRow.className = 'widget-grant-row';
 
         const capLabel = document.createElement('span');
-        capLabel.className = 'plugin-grant-cap';
+        capLabel.className = 'widget-grant-cap';
         capLabel.textContent = CAPABILITY_LABELS_MGMT[cap] ?? cap;
 
         const revokeBtn = document.createElement('button');
-        revokeBtn.className = 'plugin-grant-revoke';
+        revokeBtn.className = 'widget-grant-revoke';
         revokeBtn.textContent = 'Revoke';
         revokeBtn.addEventListener('click', () => {
-          window.electronAPI.revokePluginGrant(desc.id, cap);
-          const g = allFolderSettings[folderKey]?.pluginGrants ?? {};
+          window.electronAPI.revokeWidgetGrant(desc.id, cap);
+          const g = allFolderSettings[folderKey]?.widgetGrants ?? {};
           if (g[desc.id]) {
             g[desc.id] = g[desc.id].filter(c => c !== cap);
             if (g[desc.id].length === 0) delete g[desc.id];
           }
-          if (allFolderSettings[folderKey]) allFolderSettings[folderKey].pluginGrants = g;
+          if (allFolderSettings[folderKey]) allFolderSettings[folderKey].widgetGrants = g;
           grantRow.remove();
-          if (grantsEl.querySelectorAll('.plugin-grant-row').length === 0) grantsEl.remove();
+          if (grantsEl.querySelectorAll('.widget-grant-row').length === 0) grantsEl.remove();
         });
 
         grantRow.appendChild(capLabel);
@@ -1030,16 +1032,16 @@ function renderPluginMgmt(): void {
       row.appendChild(grantsEl);
     }
 
-    pluginMgmtList.appendChild(row);
+    widgetMgmtList.appendChild(row);
   }
 }
 
-btnPluginSettings.addEventListener('click', () => {
-  if (pluginMgmtOverlay.classList.contains('hidden')) void openPluginMgmt();
-  else closePluginMgmt();
+btnWidgetSettings.addEventListener('click', () => {
+  if (widgetMgmtOverlay.classList.contains('hidden')) void openWidgetMgmt();
+  else closeWidgetMgmt();
 });
 
-btnPluginMgmtClose.addEventListener('click', closePluginMgmt);
+btnWidgetMgmtClose.addEventListener('click', closeWidgetMgmt);
 
 // ── Launch screen ─────────────────────────────────────────────────────────────
 
@@ -1151,7 +1153,7 @@ function applySettings(settings: FolderSettings): void {
   if (settings.sidebarWidth) applySidebarWidth(settings.sidebarWidth);
 
   const layout = settings.panelLayout;
-  const allSectionIds = [...ALL_SECTIONS, ...pluginSections];
+  const allSectionIds = [...ALL_SECTIONS, ...widgetSections];
   if (layout) {
     const known = new Set(layout.order);
     sectionOrder = [...layout.order, ...allSectionIds.filter(s => !known.has(s))];
@@ -1213,11 +1215,11 @@ function launch(): void {
   launchedModel = optModel.value;
   const folderKey = selectedFolder ?? '';
 
-  // Create plugin panels now that the selected folder is known, filtering disabled plugins
+  // Create widget panels now that the selected folder is known, filtering disabled widgets
   const folderSettings = allFolderSettings[folderKey] ?? {};
-  const disabledSet = new Set(folderSettings.disabledPlugins ?? []);
-  createPluginPanels(allDescriptors.filter(d => !disabledSet.has(d.id)));
-  // Re-apply panel layout so saved order includes plugin sections
+  const disabledSet = new Set(folderSettings.disabledWidgets ?? []);
+  createWidgetPanels(allDescriptors.filter(d => !disabledSet.has(d.id)));
+  // Re-apply panel layout so saved order includes widget sections
   applySettings(folderSettings);
 
   const launchOptions: LaunchOptions = {
@@ -1272,7 +1274,7 @@ extraArgsInput.addEventListener('keydown', (e: KeyboardEvent) => { if (e.key ===
     window.electronAPI.getRecentFolders(),
     window.electronAPI.getInitialArgs(),
     window.electronAPI.getAllFolderSettings(),
-    window.electronAPI.getPluginDescriptors(),
+    window.electronAPI.getWidgetDescriptors(),
     window.electronAPI.getRecentPlugins(),
   ]);
   allDescriptors = descriptors;

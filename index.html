@@ -1050,18 +1050,18 @@
       background: #444;
     }
 
-    /* ── Plugin management overlay ── */
+    /* ── Widget management overlay ── */
 
-    #plugin-mgmt-overlay {
+    #widget-mgmt-overlay {
       flex: 1;
       display: flex;
       flex-direction: column;
       overflow: hidden;
     }
 
-    #plugin-mgmt-overlay.hidden { display: none; }
+    #widget-mgmt-overlay.hidden { display: none; }
 
-    #plugin-mgmt-header {
+    #widget-mgmt-header {
       display: flex;
       align-items: center;
       padding: 7px 12px;
@@ -1069,7 +1069,7 @@
       flex-shrink: 0;
     }
 
-    .plugin-mgmt-title {
+    .widget-mgmt-title {
       font-size: 10px;
       font-weight: 700;
       text-transform: uppercase;
@@ -1078,7 +1078,7 @@
       flex: 1;
     }
 
-    #btn-plugin-mgmt-close {
+    #btn-widget-mgmt-close {
       background: none;
       border: none;
       color: #555;
@@ -1087,9 +1087,9 @@
       padding: 0 2px;
       line-height: 1;
     }
-    #btn-plugin-mgmt-close:hover { color: #aaa; }
+    #btn-widget-mgmt-close:hover { color: #aaa; }
 
-    #plugin-mgmt-list {
+    #widget-mgmt-list {
       flex: 1;
       overflow-y: auto;
       padding: 6px;
@@ -1098,7 +1098,7 @@
       gap: 8px;
     }
 
-    .plugin-mgmt-empty {
+    .widget-mgmt-empty {
       font-size: 11px;
       color: #444;
       text-align: center;
@@ -1106,45 +1106,45 @@
       font-style: italic;
     }
 
-    .plugin-mgmt-row {
+    .widget-mgmt-row {
       background: #212121;
       border: 1px solid #2e2e2e;
       border-radius: 4px;
       padding: 8px 10px;
     }
 
-    .plugin-mgmt-row.disabled {
+    .widget-mgmt-row.disabled {
       opacity: 0.5;
     }
 
-    .plugin-mgmt-row-header {
+    .widget-mgmt-row-header {
       display: flex;
       align-items: center;
       gap: 8px;
     }
 
-    .plugin-mgmt-name {
+    .widget-mgmt-name {
       font-size: 12px;
       font-weight: 600;
       color: #ccc;
       flex: 1;
     }
 
-    .plugin-mgmt-version {
+    .widget-mgmt-version {
       font-size: 10px;
       color: #555;
       font-family: var(--font-mono);
     }
 
     /* Toggle switch */
-    .plugin-toggle {
+    .widget-toggle {
       position: relative;
       width: 28px;
       height: 16px;
       flex-shrink: 0;
     }
-    .plugin-toggle input { opacity: 0; width: 0; height: 0; position: absolute; }
-    .plugin-toggle-slider {
+    .widget-toggle input { opacity: 0; width: 0; height: 0; position: absolute; }
+    .widget-toggle-slider {
       position: absolute;
       inset: 0;
       background: #333;
@@ -1152,7 +1152,7 @@
       cursor: pointer;
       transition: background 0.15s;
     }
-    .plugin-toggle-slider::before {
+    .widget-toggle-slider::before {
       content: '';
       position: absolute;
       width: 10px;
@@ -1163,20 +1163,20 @@
       border-radius: 50%;
       transition: transform 0.15s, background 0.15s;
     }
-    .plugin-toggle input:checked + .plugin-toggle-slider { background: #1a3a1a; }
-    .plugin-toggle input:checked + .plugin-toggle-slider::before {
+    .widget-toggle input:checked + .widget-toggle-slider { background: #1a3a1a; }
+    .widget-toggle input:checked + .widget-toggle-slider::before {
       transform: translateX(12px);
       background: #4ec94e;
     }
 
-    .plugin-restart-note {
+    .widget-restart-note {
       font-size: 10px;
       color: #556655;
       margin-top: 5px;
       font-style: italic;
     }
 
-    .plugin-grants {
+    .widget-grants {
       margin-top: 8px;
       border-top: 1px solid #2a2a2a;
       padding-top: 6px;
@@ -1185,7 +1185,7 @@
       gap: 3px;
     }
 
-    .plugin-grants-label {
+    .widget-grants-label {
       font-size: 10px;
       font-weight: 600;
       color: #555;
@@ -1194,20 +1194,20 @@
       margin-bottom: 2px;
     }
 
-    .plugin-grant-row {
+    .widget-grant-row {
       display: flex;
       align-items: center;
       gap: 6px;
     }
 
-    .plugin-grant-cap {
+    .widget-grant-cap {
       font-size: 11px;
       color: #888;
       flex: 1;
       font-family: var(--font-mono);
     }
 
-    .plugin-grant-revoke {
+    .widget-grant-revoke {
       font-size: 10px;
       font-weight: 600;
       padding: 2px 6px;
@@ -1217,9 +1217,9 @@
       color: #e84e4e;
       cursor: pointer;
     }
-    .plugin-grant-revoke:hover { opacity: 0.8; }
+    .widget-grant-revoke:hover { opacity: 0.8; }
 
-    .plugin-no-grants {
+    .widget-no-grants {
       font-size: 10px;
       color: #444;
       font-style: italic;
@@ -1331,7 +1331,7 @@
       <button class="panel-toggle-btn" data-section="permissions" title="Toggle Permissions">Perm</button>
       <button class="panel-toggle-btn" data-section="cost" title="Toggle Cost">Cost</button>
       <button class="panel-toggle-btn" data-section="context" title="Toggle Context">Ctx</button>
-      <button id="btn-plugin-settings" class="panel-toggle-btn" title="Manage plugins" style="margin-left:auto">Plugins</button>
+      <button id="btn-widget-settings" class="panel-toggle-btn" title="Manage widgets" style="margin-left:auto">Widgets</button>
     </div>
     <div id="panel-sections">
       <div class="panel-section" id="section-tools" draggable="true" data-section-id="tools">
@@ -1395,13 +1395,13 @@
       </div>
     </div>
 
-    <!-- Plugin management overlay -->
-    <div id="plugin-mgmt-overlay" class="hidden">
-      <div id="plugin-mgmt-header">
-        <span class="plugin-mgmt-title">Plugins</span>
-        <button id="btn-plugin-mgmt-close">×</button>
+    <!-- Widget management overlay -->
+    <div id="widget-mgmt-overlay" class="hidden">
+      <div id="widget-mgmt-header">
+        <span class="widget-mgmt-title">Widgets</span>
+        <button id="btn-widget-mgmt-close">×</button>
       </div>
-      <div id="plugin-mgmt-list"></div>
+      <div id="widget-mgmt-list"></div>
     </div>
   </div>
 
