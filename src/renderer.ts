@@ -43,12 +43,29 @@ window.electronAPI.onTerminalExit((code: number) => {
 terminal.onData((data: string) => window.electronAPI.sendInput(data));
 
 terminal.attachCustomKeyEventHandler((e: KeyboardEvent) => {
-  if (e.type === 'keydown' && e.ctrlKey && e.key === 'v') {
+  if (e.type !== 'keydown') return true;
+
+  // Ctrl+V: paste text from clipboard
+  if (e.ctrlKey && e.key === 'v') {
     window.electronAPI.readClipboard().then((text: string) => {
       if (text) terminal.paste(text);
     });
     return false;
   }
+
+  // Ctrl+Shift+C: copy selected text (mirrors right-click copy)
+  if (e.ctrlKey && e.shiftKey && e.key === 'C') {
+    const selection = terminal.getSelection();
+    if (selection) window.electronAPI.writeClipboard(selection);
+    return false;
+  }
+
+  // Ctrl+Enter: send \n so Claude Code treats it as a soft newline (not submit)
+  if (e.ctrlKey && e.key === 'Enter') {
+    window.electronAPI.sendInput('\n');
+    return false;
+  }
+
   return true;
 });
 
