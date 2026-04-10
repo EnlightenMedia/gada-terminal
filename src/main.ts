@@ -341,6 +341,10 @@ ipcMain.on('folders:set-sidebar-width', (_, folder: string, width: number) => {
   saveFolderSetting(userDataPath, folder, 'sidebarWidth', width);
 });
 
+ipcMain.on('folders:set-sidebar-left-width', (_, folder: string, width: number) => {
+  saveFolderSetting(userDataPath, folder, 'sidebarLeftWidth', width);
+});
+
 ipcMain.on('window:set-accent-color', (_, color: string | null) => {
   if (mainWindow && !mainWindow.isDestroyed()) {
     const accentColor = color ?? '#1e1e1e';

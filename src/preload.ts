@@ -10,10 +10,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.send('folders:set-accent-color', folder, color),
   setLaunchOptions: (folder: string, options: unknown) =>
     ipcRenderer.send('folders:set-launch-options', folder, options),
-  setPanelLayout: (folder: string, layout: { order: string[]; hidden: string[] }) =>
+  setPanelLayout: (folder: string, layout: { order: string[]; hidden: string[]; sides?: Record<string, string> }) =>
     ipcRenderer.send('folders:set-panel-layout', folder, layout),
   setSidebarWidth: (folder: string, width: number) =>
     ipcRenderer.send('folders:set-sidebar-width', folder, width),
+  setSidebarLeftWidth: (folder: string, width: number) =>
+    ipcRenderer.send('folders:set-sidebar-left-width', folder, width),
   setWindowAccentColor: (color: string | null) =>
     ipcRenderer.send('window:set-accent-color', color),
 

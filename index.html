@@ -50,6 +50,94 @@
       pointer-events: none;
     }
 
+    /* ── Sidebar toolbar (gear button row) ── */
+
+    .sidebar-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      padding: 3px 6px;
+      border-bottom: 1px solid #222;
+      flex-shrink: 0;
+      height: 26px;
+    }
+
+    .btn-sidebar-settings {
+      background: none;
+      border: none;
+      color: #3a3a3a;
+      font-size: 14px;
+      padding: 0 4px;
+      height: 100%;
+      cursor: pointer;
+      line-height: 1;
+      transition: color 0.1s;
+      display: flex;
+      align-items: center;
+    }
+    .btn-sidebar-settings:hover { color: #888; background: none; }
+    .btn-sidebar-settings.active { color: #aaa; }
+
+    /* ── Settings popup ── */
+
+    #settings-popup {
+      position: fixed;
+      z-index: 4000;
+      width: 230px;
+      background: #1e1e1e;
+      border: 1px solid #333;
+      border-radius: 6px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.55);
+      overflow: hidden;
+    }
+    #settings-popup.hidden { display: none; }
+
+    .settings-popup-header {
+      padding: 8px 12px;
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: #555;
+      border-bottom: 1px solid #2a2a2a;
+    }
+
+    #settings-popup-list {
+      padding: 4px 0;
+      max-height: 280px;
+      overflow-y: auto;
+    }
+
+    .settings-popup-row {
+      display: flex;
+      align-items: center;
+      padding: 6px 12px;
+      gap: 8px;
+    }
+    .settings-popup-row:hover { background: #242424; }
+
+    .settings-popup-name {
+      flex: 1;
+      font-size: 12px;
+      color: #aaa;
+      user-select: none;
+    }
+    .settings-popup-row.hidden-section .settings-popup-name { color: #555; }
+
+    .settings-popup-footer {
+      border-top: 1px solid #2a2a2a;
+      padding: 6px 8px;
+    }
+    .settings-popup-footer button {
+      width: 100%;
+      font-size: 11px;
+      background: transparent;
+      border: 1px solid #2a2a2a;
+      color: #555;
+      padding: 4px 8px;
+    }
+    .settings-popup-footer button:hover { color: #aaa; border-color: #3a3a3a; background: transparent; }
+
     #main-content {
       flex: 1;
       display: flex;
@@ -85,9 +173,9 @@
       z-index: 100;
     }
 
-    /* ── Panel (sidebar) ── */
+    /* ── Sidebars ── */
 
-    #panel {
+    .sidebar {
       width: 350px;
       min-width: 200px;
       max-width: 700px;
@@ -95,12 +183,16 @@
       background: #181818;
       display: flex;
       flex-direction: column;
-      border-left: 1px solid #2a2a2a;
       overflow: hidden;
       flex-shrink: 0;
     }
 
-    #sidebar-resize-handle {
+    .sidebar.hidden { display: none; }
+
+    #panel-left  { border-right: 1px solid #2a2a2a; width: 300px; }
+    #panel-right { border-left:  1px solid #2a2a2a; }
+
+    .sidebar-resize-handle {
       width: 4px;
       cursor: col-resize;
       background: transparent;
@@ -110,65 +202,42 @@
       transition: background 0.15s;
     }
 
-    #sidebar-resize-handle:hover,
-    #sidebar-resize-handle.dragging {
+    .sidebar-resize-handle:hover,
+    .sidebar-resize-handle.dragging {
       background: #2e2e2e;
     }
 
-    /* Toggle bar */
-    #panel-toggle-bar {
-      display: flex;
-      flex-direction: row;
-      gap: 2px;
-      padding: 5px 8px;
-      border-bottom: 1px solid #2a2a2a;
-      flex-shrink: 0;
-      align-items: center;
-    }
-
-    #panel-toggle-label {
-      font-size: 10px;
-      color: #444;
-      margin-right: 4px;
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
-      font-weight: 600;
-    }
-
-    .panel-toggle-btn {
-      font-family: var(--font-ui);
-      font-size: 10px;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
-      padding: 2px 7px;
-      border-radius: 3px;
-      border: 1px solid #2a2a2a;
-      background: transparent;
-      color: #444;
-      cursor: pointer;
-      transition: background 0.1s, color 0.1s;
-    }
-
-    /* active = section is VISIBLE */
-    .panel-toggle-btn.active {
-      border-color: #3a3a3a;
-      color: #aaa;
-      background: #242424;
-    }
-
-    .panel-toggle-btn:disabled {
-      color: #2e2e2e;
-      border-color: #222;
-      cursor: default;
-    }
+    .sidebar-resize-handle.hidden { display: none; }
 
     /* Sections container */
-    #panel-sections {
+    .sidebar-sections {
       flex: 1;
       display: flex;
       flex-direction: column;
       overflow: hidden;
+    }
+
+    .sidebar-sections.drag-target-sidebar {
+      outline: 2px dashed #4eb8e8;
+      outline-offset: -3px;
+    }
+
+    /* Reveal hidden panels as drop zones while any widget is being dragged */
+    body.dragging-widget #panel-left.hidden,
+    body.dragging-widget #panel-right.hidden {
+      display: flex !important;
+      width: 80px;
+      min-width: 80px;
+      opacity: 0.45;
+    }
+    body.dragging-widget #sidebar-left-resize-handle.hidden,
+    body.dragging-widget #sidebar-right-resize-handle.hidden {
+      display: block !important;
+    }
+    body.dragging-widget #panel-left-sections.drag-target-sidebar,
+    body.dragging-widget #panel-right-sections.drag-target-sidebar {
+      opacity: 1 !important;
+      outline: 2px dashed #4eb8e8;
     }
 
     /* Panel section — flexible sections share remaining height; fixed sections use content height */
@@ -1050,31 +1119,48 @@
       background: #444;
     }
 
-    /* ── Widget management overlay ── */
+    /* ── Widget management overlay (full-screen) ── */
 
     #widget-mgmt-overlay {
-      flex: 1;
+      position: fixed;
+      inset: 0;
+      z-index: 3000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    #widget-mgmt-overlay.hidden { display: none; }
+
+    .widget-mgmt-backdrop {
+      position: absolute;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.6);
+    }
+
+    .widget-mgmt-card {
+      position: relative;
+      width: 440px;
+      max-height: 70vh;
+      background: #242424;
+      border: 1px solid #333;
+      border-radius: 6px;
       display: flex;
       flex-direction: column;
       overflow: hidden;
     }
 
-    #widget-mgmt-overlay.hidden { display: none; }
-
     #widget-mgmt-header {
       display: flex;
       align-items: center;
-      padding: 7px 12px;
-      border-bottom: 1px solid #222;
+      padding: 10px 14px;
+      border-bottom: 1px solid #2e2e2e;
       flex-shrink: 0;
     }
 
     .widget-mgmt-title {
-      font-size: 10px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.1em;
-      color: #666;
+      font-size: 12px;
+      font-weight: 600;
+      color: #aaa;
       flex: 1;
     }
 
@@ -1228,7 +1314,18 @@
 </head>
 <body>
 
-  <div id="titlebar"><span id="titlebar-text">Gada Terminal</span></div>
+  <div id="titlebar">
+    <span id="titlebar-text">Gada Terminal</span>
+  </div>
+
+  <!-- Settings popup -->
+  <div id="settings-popup" class="hidden">
+    <div class="settings-popup-header">Widgets</div>
+    <div id="settings-popup-list"></div>
+    <div class="settings-popup-footer">
+      <button id="btn-open-widget-mgmt">Manage Plugins…</button>
+    </div>
+  </div>
 
   <!-- Launch screen overlay -->
   <div id="launch-screen">
@@ -1317,95 +1414,102 @@
 
   <div id="main-content">
 
-  <!-- Terminal -->
-  <div id="terminal-container"></div>
-
-  <!-- Sidebar resize handle -->
-  <div id="sidebar-resize-handle"></div>
-
-  <!-- Side panel -->
-  <div id="panel">
-    <div id="panel-toggle-bar">
-      <span id="panel-toggle-label">Show</span>
-      <button class="panel-toggle-btn active" data-section="tools" title="Toggle Tools">Tools</button>
-      <button class="panel-toggle-btn" data-section="permissions" title="Toggle Permissions">Perm</button>
-      <button class="panel-toggle-btn" data-section="cost" title="Toggle Cost">Cost</button>
-      <button class="panel-toggle-btn" data-section="context" title="Toggle Context">Ctx</button>
-      <button id="btn-widget-settings" class="panel-toggle-btn" title="Manage widgets" style="margin-left:auto">Widgets</button>
+    <!-- Left sidebar (hidden by default — empty) -->
+    <div id="panel-left" class="sidebar hidden">
+      <div class="sidebar-toolbar">
+        <button class="btn-sidebar-settings" title="Widget visibility">⚙</button>
+      </div>
+      <div id="panel-left-sections" class="sidebar-sections"></div>
     </div>
-    <div id="panel-sections">
-      <div class="panel-section" id="section-tools" draggable="true" data-section-id="tools">
-        <div class="panel-section-header">
-          <span class="panel-section-title">Tools</span>
-          <button id="btn-tool-history" class="perm-history-btn">History</button>
-        </div>
-        <div class="panel-section-body" id="tools-feed"></div>
+    <div id="sidebar-left-resize-handle" class="sidebar-resize-handle hidden"></div>
+
+    <!-- Terminal -->
+    <div id="terminal-container"></div>
+
+    <!-- Right resize handle -->
+    <div id="sidebar-right-resize-handle" class="sidebar-resize-handle"></div>
+
+    <!-- Right sidebar -->
+    <div id="panel-right" class="sidebar">
+      <div class="sidebar-toolbar">
+        <button class="btn-sidebar-settings" title="Widget visibility">⚙</button>
       </div>
-      <div class="panel-section hidden" id="section-permissions" draggable="true" data-section-id="permissions">
-        <div class="panel-section-header">
-          <span class="panel-section-title">Permissions</span>
-          <span id="perm-mode-badge" class="perm-mode-badge" style="display:none"></span>
-          <button id="btn-perm-history" class="perm-history-btn">History</button>
+      <div id="panel-right-sections" class="sidebar-sections">
+        <div class="panel-section" id="section-tools" draggable="true" data-section-id="tools">
+          <div class="panel-section-header">
+            <span class="panel-section-title">Tools</span>
+            <button id="btn-tool-history" class="perm-history-btn">History</button>
+          </div>
+          <div class="panel-section-body" id="tools-feed"></div>
         </div>
-        <div class="panel-section-body" id="permissions-feed"></div>
-      </div>
-      <div class="panel-section fixed-height hidden" id="section-cost" draggable="true" data-section-id="cost">
-        <div class="panel-section-header"><span class="panel-section-title">Cost</span></div>
-        <div class="panel-section-body" id="cost-feed">
-          <div class="cost-summary" id="cost-summary" title="Click for request breakdown">
-            <span class="cost-summary-total" id="cost-total">$0.0000</span>
-            <div class="cost-summary-stats">
-              <div class="cost-stat-row"><span>Input</span><span id="cost-s-input">0</span></div>
-              <div class="cost-stat-row"><span>Output</span><span id="cost-s-output">0</span></div>
-              <div class="cost-stat-row"><span>Cache Read</span><span id="cost-s-cache-read">0</span></div>
-              <div class="cost-stat-row"><span>Cache Write</span><span id="cost-s-cache-write">0</span></div>
-              <div class="cost-stat-row"><span>Requests</span><span id="cost-s-requests">0</span></div>
+        <div class="panel-section hidden" id="section-permissions" draggable="true" data-section-id="permissions">
+          <div class="panel-section-header">
+            <span class="panel-section-title">Permissions</span>
+            <span id="perm-mode-badge" class="perm-mode-badge" style="display:none"></span>
+            <button id="btn-perm-history" class="perm-history-btn">History</button>
+          </div>
+          <div class="panel-section-body" id="permissions-feed"></div>
+        </div>
+        <div class="panel-section fixed-height hidden" id="section-cost" draggable="true" data-section-id="cost">
+          <div class="panel-section-header"><span class="panel-section-title">Cost</span></div>
+          <div class="panel-section-body" id="cost-feed">
+            <div class="cost-summary" id="cost-summary" title="Click for request breakdown">
+              <span class="cost-summary-total" id="cost-total">$0.0000</span>
+              <div class="cost-summary-stats">
+                <div class="cost-stat-row"><span>Input</span><span id="cost-s-input">0</span></div>
+                <div class="cost-stat-row"><span>Output</span><span id="cost-s-output">0</span></div>
+                <div class="cost-stat-row"><span>Cache Read</span><span id="cost-s-cache-read">0</span></div>
+                <div class="cost-stat-row"><span>Cache Write</span><span id="cost-s-cache-write">0</span></div>
+                <div class="cost-stat-row"><span>Requests</span><span id="cost-s-requests">0</span></div>
+              </div>
             </div>
           </div>
         </div>
-      </div>
-      <div class="panel-section fixed-height hidden" id="section-context" draggable="true" data-section-id="context">
-        <div class="panel-section-header"><span class="panel-section-title">Context</span></div>
-        <div class="ctx-bar-wrap">
-          <div class="ctx-bar-track"><div class="ctx-bar-fill" id="ctx-bar" style="width:0%"></div></div>
+        <div class="panel-section fixed-height hidden" id="section-context" draggable="true" data-section-id="context">
+          <div class="panel-section-header"><span class="panel-section-title">Context</span></div>
+          <div class="ctx-bar-wrap">
+            <div class="ctx-bar-track"><div class="ctx-bar-fill" id="ctx-bar" style="width:0%"></div></div>
+          </div>
+          <div class="ctx-stats">
+            <div class="ctx-stat-row total">
+              <span class="ctx-stat-label" id="ctx-used-label">0 / 200,000 tokens</span>
+              <span class="ctx-stat-value" id="ctx-pct">0%</span>
+            </div>
+            <div class="ctx-stat-row">
+              <span class="ctx-stat-label">Input</span>
+              <span class="ctx-stat-value" id="ctx-input">0</span>
+            </div>
+            <div class="ctx-stat-row">
+              <span class="ctx-stat-label">Cache Read</span>
+              <span class="ctx-stat-value" id="ctx-cache-read">0</span>
+            </div>
+            <div class="ctx-stat-row">
+              <span class="ctx-stat-label">Cache Write</span>
+              <span class="ctx-stat-value" id="ctx-cache-write">0</span>
+            </div>
+            <div class="ctx-stat-row">
+              <span class="ctx-stat-label">Output</span>
+              <span class="ctx-stat-value" id="ctx-output">0</span>
+            </div>
+          </div>
+          <div class="panel-section-body" id="context-feed"></div>
         </div>
-        <div class="ctx-stats">
-          <div class="ctx-stat-row total">
-            <span class="ctx-stat-label" id="ctx-used-label">0 / 200,000 tokens</span>
-            <span class="ctx-stat-value" id="ctx-pct">0%</span>
-          </div>
-          <div class="ctx-stat-row">
-            <span class="ctx-stat-label">Input</span>
-            <span class="ctx-stat-value" id="ctx-input">0</span>
-          </div>
-          <div class="ctx-stat-row">
-            <span class="ctx-stat-label">Cache Read</span>
-            <span class="ctx-stat-value" id="ctx-cache-read">0</span>
-          </div>
-          <div class="ctx-stat-row">
-            <span class="ctx-stat-label">Cache Write</span>
-            <span class="ctx-stat-value" id="ctx-cache-write">0</span>
-          </div>
-          <div class="ctx-stat-row">
-            <span class="ctx-stat-label">Output</span>
-            <span class="ctx-stat-value" id="ctx-output">0</span>
-          </div>
-        </div>
-        <div class="panel-section-body" id="context-feed"></div>
       </div>
     </div>
 
-    <!-- Widget management overlay -->
-    <div id="widget-mgmt-overlay" class="hidden">
+  </div> <!-- #main-content -->
+
+  <!-- Widget management overlay (full-screen) -->
+  <div id="widget-mgmt-overlay" class="hidden">
+    <div class="widget-mgmt-backdrop" id="widget-mgmt-backdrop"></div>
+    <div class="widget-mgmt-card">
       <div id="widget-mgmt-header">
-        <span class="widget-mgmt-title">Widgets</span>
+        <span class="widget-mgmt-title">Plugin Management</span>
         <button id="btn-widget-mgmt-close">×</button>
       </div>
       <div id="widget-mgmt-list"></div>
     </div>
   </div>
-
-  </div> <!-- #main-content -->
 
   <!-- Tools history popup -->
   <div id="tool-history-popup" class="perm-popup hidden">

@@ -105,35 +105,68 @@ container.addEventListener('drop', (e: DragEvent) => {
 
 // ── Sidebar resize ────────────────────────────────────────────────────────────
 
-const sidebarPanel = document.getElementById('panel') as HTMLElement;
-const sidebarResizeHandle = document.getElementById('sidebar-resize-handle') as HTMLElement;
+const panelLeft  = document.getElementById('panel-left')  as HTMLElement;
+const panelRight = document.getElementById('panel-right') as HTMLElement;
+const sidebarLeftResizeHandle  = document.getElementById('sidebar-left-resize-handle')  as HTMLElement;
+const sidebarRightResizeHandle = document.getElementById('sidebar-right-resize-handle') as HTMLElement;
+const panelLeftSections  = document.getElementById('panel-left-sections')  as HTMLElement;
+const panelRightSections = document.getElementById('panel-right-sections') as HTMLElement;
+const settingsPopup      = document.getElementById('settings-popup')      as HTMLElement;
+const settingsPopupList  = document.getElementById('settings-popup-list') as HTMLElement;
+const btnOpenWidgetMgmt  = document.getElementById('btn-open-widget-mgmt') as HTMLButtonElement;
+
 const MIN_SIDEBAR_WIDTH = 200;
 const MAX_SIDEBAR_WIDTH = 700;
-let sidebarSaveTimeout: ReturnType<typeof setTimeout> | null = null;
+let sidebarRightSaveTimeout: ReturnType<typeof setTimeout> | null = null;
+let sidebarLeftSaveTimeout:  ReturnType<typeof setTimeout> | null = null;
 
-function applySidebarWidth(width: number): void {
-  sidebarPanel.style.width = `${width}px`;
-}
-
-sidebarResizeHandle.addEventListener('mousedown', (e) => {
+// Right sidebar: handle sits at left edge; drag left → wider
+sidebarRightResizeHandle.addEventListener('mousedown', (e) => {
   e.preventDefault();
-  sidebarResizeHandle.classList.add('dragging');
+  sidebarRightResizeHandle.classList.add('dragging');
   const startX = e.clientX;
-  const startWidth = sidebarPanel.offsetWidth;
+  const startWidth = panelRight.offsetWidth;
 
   function onMouseMove(mv: MouseEvent): void {
     const newWidth = Math.max(MIN_SIDEBAR_WIDTH, Math.min(MAX_SIDEBAR_WIDTH, startWidth + (startX - mv.clientX)));
-    applySidebarWidth(newWidth);
+    panelRight.style.width = `${newWidth}px`;
   }
 
   function onMouseUp(): void {
-    sidebarResizeHandle.classList.remove('dragging');
+    sidebarRightResizeHandle.classList.remove('dragging');
     document.removeEventListener('mousemove', onMouseMove);
     document.removeEventListener('mouseup', onMouseUp);
-    const finalWidth = sidebarPanel.offsetWidth;
-    if (sidebarSaveTimeout) clearTimeout(sidebarSaveTimeout);
-    sidebarSaveTimeout = setTimeout(() => {
+    const finalWidth = panelRight.offsetWidth;
+    if (sidebarRightSaveTimeout) clearTimeout(sidebarRightSaveTimeout);
+    sidebarRightSaveTimeout = setTimeout(() => {
       window.electronAPI.setSidebarWidth(selectedFolder ?? '', finalWidth);
+    }, 300);
+  }
+
+  document.addEventListener('mousemove', onMouseMove);
+  document.addEventListener('mouseup', onMouseUp);
+});
+
+// Left sidebar: handle sits at right edge; drag right → wider
+sidebarLeftResizeHandle.addEventListener('mousedown', (e) => {
+  e.preventDefault();
+  sidebarLeftResizeHandle.classList.add('dragging');
+  const startX = e.clientX;
+  const startWidth = panelLeft.offsetWidth;
+
+  function onMouseMove(mv: MouseEvent): void {
+    const newWidth = Math.max(MIN_SIDEBAR_WIDTH, Math.min(MAX_SIDEBAR_WIDTH, startWidth + (mv.clientX - startX)));
+    panelLeft.style.width = `${newWidth}px`;
+  }
+
+  function onMouseUp(): void {
+    sidebarLeftResizeHandle.classList.remove('dragging');
+    document.removeEventListener('mousemove', onMouseMove);
+    document.removeEventListener('mouseup', onMouseUp);
+    const finalWidth = panelLeft.offsetWidth;
+    if (sidebarLeftSaveTimeout) clearTimeout(sidebarLeftSaveTimeout);
+    sidebarLeftSaveTimeout = setTimeout(() => {
+      window.electronAPI.setSidebarLeftWidth(selectedFolder ?? '', finalWidth);
     }, 300);
   }
 
@@ -148,58 +181,76 @@ const DEFAULT_HIDDEN = new Set(['permissions', 'cost', 'context']);
 
 let sectionOrder: string[] = [...ALL_SECTIONS];
 const hiddenSections: Set<string> = new Set(DEFAULT_HIDDEN);
+const sectionSides = new Map<string, 'left' | 'right'>(); // absent = 'right'
 
 // Widget panels
 let allDescriptors: WidgetDescriptor[] = [];
 const widgetSections: string[] = [];
 const widgetIframes = new Map<string, { iframe: HTMLIFrameElement; permissions: string[]; capabilities: string[] }>();
 
+const sectionNames = new Map<string, string>([
+  ['tools',       'Tools'],
+  ['permissions', 'Permissions'],
+  ['cost',        'Cost'],
+  ['context',     'Context'],
+]);
+
+function getSectionSide(id: string): 'left' | 'right' {
+  return sectionSides.get(id) ?? 'right';
+}
+
+function updateSidebarVisibility(): void {
+  const leftHasVisible  = sectionOrder.some(id => getSectionSide(id) === 'left'  && !hiddenSections.has(id));
+  const rightHasVisible = sectionOrder.some(id => getSectionSide(id) === 'right' && !hiddenSections.has(id));
+
+  panelLeft.classList.toggle('hidden', !leftHasVisible);
+  sidebarLeftResizeHandle.classList.toggle('hidden', !leftHasVisible);
+  panelRight.classList.toggle('hidden', !rightHasVisible);
+  sidebarRightResizeHandle.classList.toggle('hidden', !rightHasVisible);
+
+  fitAndResize();
+}
+
 function savePanelLayout(): void {
+  const sides: Record<string, string> = {};
+  for (const [id, side] of sectionSides) sides[id] = side;
   window.electronAPI.setPanelLayout(selectedFolder ?? '', {
     order: sectionOrder,
     hidden: [...hiddenSections],
+    sides,
   });
 }
 
 function applyPanelState(): void {
-  const sectionsContainer = document.getElementById('panel-sections')!;
+  // Move each section DOM element to its correct sidebar container
   for (const id of sectionOrder) {
     const el = document.getElementById(`section-${id}`);
-    if (el) sectionsContainer.appendChild(el);
+    if (!el) continue;
+    const target = getSectionSide(id) === 'left' ? panelLeftSections : panelRightSections;
+    target.appendChild(el);
   }
+  // Apply hidden/visible
   for (const id of sectionOrder) {
     const el = document.getElementById(`section-${id}`);
     if (el) el.classList.toggle('hidden', hiddenSections.has(id));
   }
-  document.querySelectorAll<HTMLButtonElement>('.panel-toggle-btn').forEach(btn => {
-    const id = btn.dataset.section!;
-    btn.classList.toggle('active', !hiddenSections.has(id));
-  });
+  updateSidebarVisibility();
+  refreshSettingsPopup();
 }
 
-function wireToggleBtn(btn: HTMLButtonElement): void {
-  btn.addEventListener('click', () => {
-    const id = btn.dataset.section!;
-    if (hiddenSections.has(id)) hiddenSections.delete(id);
-    else hiddenSections.add(id);
-    applyPanelState();
-    savePanelLayout();
-  });
-}
-
-document.querySelectorAll<HTMLButtonElement>('.panel-toggle-btn').forEach(wireToggleBtn);
-
-// Section drag-and-drop reorder
+// Section drag-and-drop (reorder within same side, or move across sides)
 let dragSectionId: string | null = null;
 
 function wireSection(section: HTMLElement, id: string): void {
   section.addEventListener('dragstart', (e) => {
     dragSectionId = id;
     e.dataTransfer!.effectAllowed = 'move';
+    document.body.classList.add('dragging-widget');
   });
 
   section.addEventListener('dragover', (e) => {
     e.preventDefault();
+    e.stopPropagation();
     if (dragSectionId === id) return;
     section.classList.add('drag-target-above');
   });
@@ -210,12 +261,18 @@ function wireSection(section: HTMLElement, id: string): void {
 
   section.addEventListener('drop', (e) => {
     e.preventDefault();
+    e.stopPropagation();
     section.classList.remove('drag-target-above');
     if (!dragSectionId || dragSectionId === id) return;
+
+    // Move dragged section to the same side as the target
+    sectionSides.set(dragSectionId, getSectionSide(id));
+
     const fromIdx = sectionOrder.indexOf(dragSectionId);
-    const toIdx = sectionOrder.indexOf(id);
+    const toIdx   = sectionOrder.indexOf(id);
     sectionOrder.splice(fromIdx, 1);
     sectionOrder.splice(toIdx, 0, dragSectionId);
+
     applyPanelState();
     savePanelLayout();
     dragSectionId = null;
@@ -225,13 +282,42 @@ function wireSection(section: HTMLElement, id: string): void {
     document.querySelectorAll('.panel-section').forEach(s =>
       s.classList.remove('drag-target-above')
     );
+    document.body.classList.remove('dragging-widget');
     dragSectionId = null;
   });
 }
 
+// Allow dropping onto a sidebar container (e.g. into empty panel)
+function wireSidebarContainer(containerEl: HTMLElement, side: 'left' | 'right'): void {
+  containerEl.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    containerEl.classList.add('drag-target-sidebar');
+  });
+
+  containerEl.addEventListener('dragleave', (e) => {
+    if (!containerEl.contains(e.relatedTarget as Node)) {
+      containerEl.classList.remove('drag-target-sidebar');
+    }
+  });
+
+  containerEl.addEventListener('drop', (e) => {
+    e.preventDefault();
+    containerEl.classList.remove('drag-target-sidebar');
+    if (!dragSectionId) return;
+    sectionSides.set(dragSectionId, side);
+    applyPanelState();
+    savePanelLayout();
+    dragSectionId = null;
+  });
+}
+
+// Wire built-in sections
 document.querySelectorAll<HTMLElement>('.panel-section').forEach(section => {
   wireSection(section, section.dataset.sectionId!);
 });
+
+wireSidebarContainer(panelLeftSections, 'left');
+wireSidebarContainer(panelRightSections, 'right');
 
 applyPanelState();
 
@@ -294,24 +380,14 @@ function buildSrcdoc(desc: WidgetDescriptor): string {
 function createWidgetPanels(descriptors: WidgetDescriptor[]): void {
   if (descriptors.length === 0) return;
 
-  const toggleBar = document.getElementById('panel-toggle-bar')!;
-  const sectionsContainer = document.getElementById('panel-sections')!;
   const newIds: string[] = [];
 
   for (const desc of descriptors) {
     widgetSections.push(desc.id);
     newIds.push(desc.id);
+    sectionNames.set(desc.id, desc.name);
 
-    // Toggle button
-    const btn = document.createElement('button');
-    btn.className = 'panel-toggle-btn active';
-    btn.dataset.section = desc.id;
-    btn.title = `Toggle ${desc.name}`;
-    btn.textContent = desc.name.slice(0, 5);
-    wireToggleBtn(btn);
-    toggleBar.appendChild(btn);
-
-    // Section
+    // Section element (defaults to right panel; applyPanelState will place it correctly)
     const section = document.createElement('div');
     section.className = 'panel-section';
     section.id = `section-${desc.id}`;
@@ -337,7 +413,7 @@ function createWidgetPanels(descriptors: WidgetDescriptor[]): void {
     iframe.srcdoc = buildSrcdoc(desc);
     body.appendChild(iframe);
     section.appendChild(body);
-    sectionsContainer.appendChild(section);
+    panelRightSections.appendChild(section);
 
     widgetIframes.set(desc.id, { iframe, permissions: desc.permissions, capabilities: desc.capabilities });
 
@@ -373,8 +449,6 @@ function createWidgetPanels(descriptors: WidgetDescriptor[]): void {
 
   sectionOrder = [...sectionOrder, ...newIds];
 }
-
-
 
 function forwardToWidgets(eventType: string, payload: unknown): void {
   for (const [, { iframe, permissions }] of widgetIframes) {
@@ -702,7 +776,6 @@ function createWidgetCapabilityCard(req: WidgetCapabilityRequest): HTMLElement {
 
   function decide(decision: 'allow' | 'allow-session' | 'deny', label: string, badgeClass: string): void {
     card.remove();
-    // Reuse history entry pattern with pluginName as the "tool"
     addPermHistory(
       { id: req.id, toolName: `${req.widgetName} · ${req.capability}`, input: {}, timestamp: req.timestamp },
       label,
@@ -878,10 +951,9 @@ window.electronAPI.onApiRequest((event: ApiRequestEvent) => {
 
 // ── Widget management overlay ─────────────────────────────────────────────────
 
-const widgetMgmtOverlay = document.getElementById('widget-mgmt-overlay') as HTMLElement;
-const widgetMgmtList = document.getElementById('widget-mgmt-list') as HTMLElement;
-const panelSections = document.getElementById('panel-sections') as HTMLElement;
-const btnWidgetSettings = document.getElementById('btn-widget-settings') as HTMLButtonElement;
+const widgetMgmtOverlay  = document.getElementById('widget-mgmt-overlay')  as HTMLElement;
+const widgetMgmtList     = document.getElementById('widget-mgmt-list')     as HTMLElement;
+const widgetMgmtBackdrop = document.getElementById('widget-mgmt-backdrop') as HTMLElement;
 const btnWidgetMgmtClose = document.getElementById('btn-widget-mgmt-close') as HTMLButtonElement;
 
 const CAPABILITY_LABELS_MGMT: Record<string, string> = {
@@ -892,20 +964,15 @@ const CAPABILITY_LABELS_MGMT: Record<string, string> = {
 };
 
 async function openWidgetMgmt(): Promise<void> {
-  // Always fetch fresh settings so in-session grants are visible
   if (selectedFolder) {
     allFolderSettings[selectedFolder] = await window.electronAPI.getFolderSettings(selectedFolder);
   }
   renderWidgetMgmt();
-  panelSections.style.display = 'none';
   widgetMgmtOverlay.classList.remove('hidden');
-  btnWidgetSettings.classList.add('active');
 }
 
 function closeWidgetMgmt(): void {
   widgetMgmtOverlay.classList.add('hidden');
-  panelSections.style.display = '';
-  btnWidgetSettings.classList.remove('active');
 }
 
 function renderWidgetMgmt(): void {
@@ -971,15 +1038,18 @@ function renderWidgetMgmt(): void {
       if (nowDisabled && widgetIframes.has(desc.id)) {
         // Remove panel from DOM immediately
         document.getElementById(`section-${desc.id}`)?.remove();
-        document.querySelector<HTMLButtonElement>(`.panel-toggle-btn[data-section="${desc.id}"]`)?.remove();
         const idx = sectionOrder.indexOf(desc.id);
         if (idx >= 0) sectionOrder.splice(idx, 1);
         const pIdx = widgetSections.indexOf(desc.id);
         if (pIdx >= 0) widgetSections.splice(pIdx, 1);
+        sectionSides.delete(desc.id);
+        sectionNames.delete(desc.id);
         widgetIframes.delete(desc.id);
         savePanelLayout();
+        updateSidebarVisibility();
+        refreshSettingsPopup();
       } else if (!nowDisabled && !widgetIframes.has(desc.id)) {
-        // Re-enable: inject panel immediately, no restart required
+        // Re-enable: inject panel immediately
         createWidgetPanels([desc]);
         applyPanelState();
       }
@@ -1036,12 +1106,97 @@ function renderWidgetMgmt(): void {
   }
 }
 
-btnWidgetSettings.addEventListener('click', () => {
-  if (widgetMgmtOverlay.classList.contains('hidden')) void openWidgetMgmt();
-  else closeWidgetMgmt();
+btnWidgetMgmtClose.addEventListener('click', closeWidgetMgmt);
+widgetMgmtBackdrop.addEventListener('click', closeWidgetMgmt);
+
+// ── Settings popup ────────────────────────────────────────────────────────────
+
+function openSettingsPopup(anchor: HTMLElement): void {
+  const rect = anchor.getBoundingClientRect();
+  // Position below the anchor, aligned to whichever side it's on
+  settingsPopup.style.top = `${rect.bottom + 4}px`;
+  if (rect.left < window.innerWidth / 2) {
+    settingsPopup.style.left = `${rect.left}px`;
+    settingsPopup.style.right = 'auto';
+  } else {
+    settingsPopup.style.right = `${window.innerWidth - rect.right}px`;
+    settingsPopup.style.left = 'auto';
+  }
+  settingsPopup.classList.remove('hidden');
+  document.querySelectorAll('.btn-sidebar-settings').forEach(b => b.classList.add('active'));
+  refreshSettingsPopup();
+}
+
+function closeSettingsPopup(): void {
+  settingsPopup.classList.add('hidden');
+  document.querySelectorAll('.btn-sidebar-settings').forEach(b => b.classList.remove('active'));
+}
+
+function refreshSettingsPopup(): void {
+  if (settingsPopup.classList.contains('hidden')) return;
+  settingsPopupList.innerHTML = '';
+
+  for (const id of sectionOrder) {
+    const name = sectionNames.get(id) ?? id;
+    const isHidden = hiddenSections.has(id);
+
+    const rowEl = document.createElement('div');
+    rowEl.className = 'settings-popup-row' + (isHidden ? ' hidden-section' : '');
+
+    const nameEl = document.createElement('span');
+    nameEl.className = 'settings-popup-name';
+    nameEl.textContent = name;
+
+    const toggleLabel = document.createElement('label');
+    toggleLabel.className = 'widget-toggle';
+    toggleLabel.title = isHidden ? 'Show' : 'Hide';
+
+    const toggleInput = document.createElement('input');
+    toggleInput.type = 'checkbox';
+    toggleInput.checked = !isHidden;
+
+    const toggleSlider = document.createElement('span');
+    toggleSlider.className = 'widget-toggle-slider';
+    toggleLabel.appendChild(toggleInput);
+    toggleLabel.appendChild(toggleSlider);
+
+    toggleInput.addEventListener('change', () => {
+      if (hiddenSections.has(id)) hiddenSections.delete(id);
+      else hiddenSections.add(id);
+      rowEl.classList.toggle('hidden-section', hiddenSections.has(id));
+      applyPanelState();
+      savePanelLayout();
+    });
+
+    rowEl.appendChild(nameEl);
+    rowEl.appendChild(toggleLabel);
+    settingsPopupList.appendChild(rowEl);
+  }
+}
+
+document.querySelectorAll<HTMLButtonElement>('.btn-sidebar-settings').forEach(btn => {
+  btn.addEventListener('click', () => {
+    if (settingsPopup.classList.contains('hidden')) openSettingsPopup(btn);
+    else closeSettingsPopup();
+  });
 });
 
-btnWidgetMgmtClose.addEventListener('click', closeWidgetMgmt);
+btnOpenWidgetMgmt.addEventListener('click', () => {
+  closeSettingsPopup();
+  void openWidgetMgmt();
+});
+
+document.addEventListener('mousedown', (e: MouseEvent) => {
+  if (!settingsPopup.classList.contains('hidden') &&
+      !settingsPopup.contains(e.target as Node) &&
+      !(e.target as HTMLElement).closest('.btn-sidebar-settings')) {
+    closeSettingsPopup();
+  }
+});
+
+document.addEventListener('keydown', (e: KeyboardEvent) => {
+  if (e.key === 'Escape') closeSettingsPopup();
+});
 
 // ── Launch screen ─────────────────────────────────────────────────────────────
 
@@ -1150,7 +1305,8 @@ function applySettings(settings: FolderSettings): void {
   selectedPluginDirs = opts.pluginDirs ? [...opts.pluginDirs] : [];
   renderPluginChips();
 
-  if (settings.sidebarWidth) applySidebarWidth(settings.sidebarWidth);
+  if (settings.sidebarWidth)     panelRight.style.width = `${settings.sidebarWidth}px`;
+  if (settings.sidebarLeftWidth) panelLeft.style.width  = `${settings.sidebarLeftWidth}px`;
 
   const layout = settings.panelLayout;
   const allSectionIds = [...ALL_SECTIONS, ...widgetSections];
@@ -1159,10 +1315,18 @@ function applySettings(settings: FolderSettings): void {
     sectionOrder = [...layout.order, ...allSectionIds.filter(s => !known.has(s))];
     hiddenSections.clear();
     for (const id of layout.hidden) hiddenSections.add(id);
+    // Load side assignments
+    sectionSides.clear();
+    if (layout.sides) {
+      for (const [id, side] of Object.entries(layout.sides)) {
+        if (side === 'left' || side === 'right') sectionSides.set(id, side as 'left' | 'right');
+      }
+    }
   } else {
     sectionOrder = [...allSectionIds];
     hiddenSections.clear();
     for (const id of DEFAULT_HIDDEN) hiddenSections.add(id);
+    sectionSides.clear();
   }
   applyPanelState();
 }

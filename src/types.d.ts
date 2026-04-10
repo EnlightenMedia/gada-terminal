@@ -59,8 +59,9 @@ declare global {
       launchClaude: (args: string[], cwd: string) => void;
       setAccentColor: (folder: string, color: string | undefined) => void;
       setLaunchOptions: (folder: string, options: LaunchOptions) => void;
-      setPanelLayout: (folder: string, layout: { order: string[]; hidden: string[] }) => void;
+      setPanelLayout: (folder: string, layout: { order: string[]; hidden: string[]; sides?: Record<string, string> }) => void;
       setSidebarWidth: (folder: string, width: number) => void;
+      setSidebarLeftWidth: (folder: string, width: number) => void;
       setWindowAccentColor: (color: string | null) => void;
 
       // Renderer → Main (invoke, returns Promise)

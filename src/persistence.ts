@@ -12,8 +12,9 @@ export interface LaunchOptions {
 
 export interface FolderSettings {
   accentColor?: string;
-  panelLayout?: { order: string[]; hidden: string[] };
+  panelLayout?: { order: string[]; hidden: string[]; sides?: Record<string, string> };
   sidebarWidth?: number;
+  sidebarLeftWidth?: number;
   launchOptions?: LaunchOptions;
   enabledPlugins?: string[];
   disabledWidgets?: string[];             // widgetIds that are disabled; absent = all enabled
