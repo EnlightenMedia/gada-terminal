@@ -672,11 +672,16 @@ function fmtTokensFull(n: number): string {
 let launchedModel = '';
 
 function getContextWindow(model: string): number {
-  // Check both the OTLP model string and the model configured at launch time.
-  // The OTLP attribute contains the raw API model ID which may differ from
-  // Claude Code's display alias (e.g. 'claude-opus-4-6[1m]').
-  const combined = model + ' ' + launchedModel;
-  if (combined.includes('[1m]')) return 1_000_000;
+  // OTLP emits the raw API model ID which may not carry the [1m] suffix used
+  // in Claude Code's display alias (e.g. 'claude-opus-4-6[1m]'). Fall back to
+  // the launch-time model as a hint — but only when the OTLP model still refers
+  // to the same base model. If the user switches to a different model family
+  // mid-session, the OTLP model will no longer match and the hint is ignored.
+  if (model.includes('[1m]')) return 1_000_000;
+  if (launchedModel.includes('[1m]')) {
+    const launchBase = launchedModel.replace(/\[.*$/, ''); // e.g. 'claude-opus-4-6'
+    if (model.includes(launchBase)) return 1_000_000;
+  }
   return 200_000;
 }
 
