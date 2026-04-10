@@ -166,7 +166,8 @@ function handleRequest(
       output,
       timestamp: Date.now(),
     });
-    res.writeHead(200).end('{}');
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ hookSpecificOutput: { hookEventName: 'PostToolUse' } }));
 
   } else if (hookEventName === 'PostToolUseFailure') {
     const error = String(parsed['error'] ?? '');
@@ -178,11 +179,12 @@ function handleRequest(
       error,
       timestamp: Date.now(),
     });
-    res.writeHead(200).end('{}');
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ hookSpecificOutput: { hookEventName: 'PostToolUseFailure' } }));
 
   } else {
     // Unknown event — acknowledge and ignore
-    res.writeHead(200).end('{}');
+    res.writeHead(200, { 'Content-Type': 'application/json' }).end('{}');
   }
 }
 
