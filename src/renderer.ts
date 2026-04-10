@@ -669,8 +669,14 @@ function fmtTokensFull(n: number): string {
   return n.toLocaleString();
 }
 
+let launchedModel = '';
+
 function getContextWindow(model: string): number {
-  if (model.includes('[1m]')) return 1_000_000;
+  // Check both the OTLP model string and the model configured at launch time.
+  // The OTLP attribute contains the raw API model ID which may differ from
+  // Claude Code's display alias (e.g. 'claude-opus-4-6[1m]').
+  const combined = model + ' ' + launchedModel;
+  if (combined.includes('[1m]')) return 1_000_000;
   return 200_000;
 }
 
@@ -902,6 +908,7 @@ function assembleArgs(): { args: string[]; cwd: string } {
 }
 
 function launch(): void {
+  launchedModel = optModel.value;
   const folderKey = selectedFolder ?? '';
   const launchOptions: LaunchOptions = {
     resume: optResume.checked || undefined,
