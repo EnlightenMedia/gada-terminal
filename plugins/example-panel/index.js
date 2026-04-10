@@ -10,6 +10,35 @@
   empty.textContent = 'No tools invoked yet.';
   document.body.appendChild(empty);
 
+  // Write capability demo
+  var writeBtn = document.createElement('button');
+  writeBtn.textContent = 'Send "hello" to terminal';
+  writeBtn.style.cssText = [
+    'margin-top:8px;padding:4px 8px;font-size:11px;cursor:pointer;',
+    'background:#1e3a1e;color:#4ec94e;border:1px solid #2d5a2d;border-radius:3px;',
+    'width:100%;',
+  ].join('');
+  writeBtn.addEventListener('click', function () {
+    writeBtn.disabled = true;
+    writeBtn.textContent = 'Waiting…';
+    window.PanelAPI.sendTerminalInput('hello').then(function () {
+      writeBtn.textContent = 'Sent!';
+      setTimeout(function () {
+        writeBtn.disabled = false;
+        writeBtn.textContent = 'Send "hello" to terminal';
+      }, 1500);
+    }).catch(function (err) {
+      writeBtn.textContent = err.message || 'Denied';
+      writeBtn.style.color = '#e05555';
+      setTimeout(function () {
+        writeBtn.disabled = false;
+        writeBtn.textContent = 'Send "hello" to terminal';
+        writeBtn.style.color = '#4ec94e';
+      }, 2000);
+    });
+  });
+  document.body.appendChild(writeBtn);
+
   window.PanelAPI.setTitle('Tool Count');
 
   window.PanelAPI.on('hook:tool-event', function (event) {

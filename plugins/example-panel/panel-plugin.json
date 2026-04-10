@@ -1,8 +1,9 @@
 {
   "id": "example-panel",
   "name": "Tool Count",
-  "version": "1.0.0",
-  "description": "Shows a count of each tool invoked during the session",
+  "version": "1.1.0",
+  "description": "Shows a count of each tool invoked during the session. Demonstrates terminal write capability.",
   "entry": "index.js",
-  "permissions": ["hook:tool-event"]
+  "permissions": ["hook:tool-event"],
+  "capabilities": ["terminal:write"]
 }

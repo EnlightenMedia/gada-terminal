@@ -4,6 +4,9 @@ if (squirrelStartup) process.exit(0);
 import { app, BrowserWindow, ipcMain, clipboard, Menu, dialog, screen } from 'electron';
 import * as path from 'path';
 import { existsSync, readdirSync, readFileSync, statSync } from 'fs';
+import { execFile } from 'child_process';
+import * as https from 'https';
+import * as http from 'http';
 import * as pty from 'node-pty';
 import { IPty } from 'node-pty';
 import {
@@ -20,7 +23,7 @@ import {
 import type { FolderSettings, LaunchOptions } from './persistence';
 import { startHookServer } from './hookServer';
 import { buildSettingsArgs } from './settingsBuilder';
-import type { ToolEvent, ApiRequestEvent, PermissionRequest, PermissionDecision, PluginDescriptor } from './types';
+import type { ToolEvent, ApiRequestEvent, PermissionRequest, PermissionDecision, PluginDescriptor, PluginCapabilityRequest } from './types';
 
 declare const MAIN_WINDOW_VITE_DEV_SERVER_URL: string;
 declare const MAIN_WINDOW_VITE_NAME: string;
@@ -51,7 +54,7 @@ function loadPlugins(userDataPath: string): PluginDescriptor[] {
 
       try {
         const manifest = JSON.parse(readFileSync(manifestPath, 'utf-8'));
-        const { id, name, version, entry: entryFile, permissions } = manifest;
+        const { id, name, version, entry: entryFile, permissions, capabilities } = manifest;
         if (!id || typeof id !== 'string' || !entryFile || typeof entryFile !== 'string') continue;
         if (seen.has(id)) continue;
 
@@ -64,6 +67,7 @@ function loadPlugins(userDataPath: string): PluginDescriptor[] {
           name: name ?? id,
           version: version ?? '0.0.0',
           permissions: Array.isArray(permissions) ? permissions : [],
+          capabilities: Array.isArray(capabilities) ? capabilities : [],
           entrySource: readFileSync(entryPath, 'utf-8'),
         });
       } catch { /* skip invalid plugins silently */ }
@@ -78,12 +82,27 @@ let termRows = 24;
 let quitting = false;
 let claudeSpawned = false;
 let userDataPath: string;
+let currentFolder = '';
 let hookPort = 0;
 let hookServerClose: (() => void) | null = null;
 let hookDecidePermission: ((id: string, decision: PermissionDecision) => void) | null = null;
 
 const sessionAllowedTools = new Set<string>();
 const pendingToolNames = new Map<string, string>(); // id → toolName
+
+// Plugin capability grants
+// sessionGranted: pluginId → Set<capability>  (in-memory, cleared on restart)
+// sessionDenied:  pluginId → Set<capability>  (in-memory, cleared on restart)
+const sessionGrantedCapabilities = new Map<string, Set<string>>();
+const sessionDeniedCapabilities = new Map<string, Set<string>>();
+
+type PendingCapabilityEntry = {
+  pluginId: string;
+  capability: string;
+  args: unknown[];
+  resolve: (value: { ok: boolean; result?: unknown; error?: string }) => void;
+};
+const pendingCapabilities = new Map<string, PendingCapabilityEntry>(); // approvalId → entry
 
 function findClaudePath(): string {
   const home = process.env.USERPROFILE ?? process.env.HOME ?? '';
@@ -105,6 +124,7 @@ function findClaudePath(): string {
 function spawnClaude(args: string[], cwd: string): void {
   if (claudeSpawned) return;
   claudeSpawned = true;
+  currentFolder = cwd;
 
   addRecentFolder(userDataPath, cwd);
 
@@ -353,6 +373,134 @@ ipcMain.handle('plugins:pick-dir', async () => {
 });
 ipcMain.handle('plugins:get-recent', () => getRecentPlugins(userDataPath));
 ipcMain.on('plugins:add-recent', (_, dirs: string[]) => addRecentPlugins(userDataPath, dirs));
+
+// Plugin capability helpers
+
+function isCapabilityGranted(pluginId: string, capability: string): boolean {
+  if (sessionGrantedCapabilities.get(pluginId)?.has(capability)) return true;
+  if (currentFolder) {
+    const grants = getFolderSettings(userDataPath, currentFolder).pluginGrants ?? {};
+    if (grants[pluginId]?.includes(capability)) return true;
+  }
+  return false;
+}
+
+function isCapabilityDenied(pluginId: string, capability: string): boolean {
+  return sessionDeniedCapabilities.get(pluginId)?.has(capability) ?? false;
+}
+
+function executeCapability(capability: string, args: unknown[]): Promise<{ ok: boolean; result?: unknown; error?: string }> {
+  return new Promise(resolve => {
+    try {
+      if (capability === 'terminal:write') {
+        const text = typeof args[0] === 'string' ? args[0] : '';
+        ptyProcess?.write(text);
+        resolve({ ok: true });
+      } else if (capability === 'claude:message') {
+        const text = typeof args[0] === 'string' ? args[0] : '';
+        ptyProcess?.write(text + '\n');
+        resolve({ ok: true });
+      } else if (capability === 'process:spawn') {
+        const cmd = typeof args[0] === 'string' ? args[0] : '';
+        const spawnArgs = Array.isArray(args[1]) ? (args[1] as string[]).map(String) : [];
+        execFile(cmd, spawnArgs, { timeout: 10000 }, (err, stdout, stderr) => {
+          if (err && !stdout && !stderr) {
+            resolve({ ok: false, error: err.message });
+          } else {
+            resolve({ ok: true, result: { stdout, stderr, exitCode: err?.code ?? 0 } });
+          }
+        });
+      } else if (capability === 'http:request') {
+        const url = typeof args[0] === 'string' ? args[0] : '';
+        const opts = (args[1] && typeof args[1] === 'object' ? args[1] : {}) as {
+          method?: string; headers?: Record<string, string>; body?: string;
+        };
+        const parsed = new URL(url);
+        const lib = parsed.protocol === 'https:' ? https : http;
+        const reqOpts: http.RequestOptions = {
+          method: opts.method ?? 'GET',
+          headers: opts.headers ?? {},
+        };
+        const req = lib.request(parsed, reqOpts, (res) => {
+          const chunks: Buffer[] = [];
+          res.on('data', (c: Buffer) => chunks.push(c));
+          res.on('end', () => {
+            resolve({ ok: true, result: { status: res.statusCode, body: Buffer.concat(chunks).toString('utf-8') } });
+          });
+        });
+        req.on('error', (err: Error) => resolve({ ok: false, error: err.message }));
+        if (opts.body) req.write(opts.body);
+        req.end();
+      } else {
+        resolve({ ok: false, error: `Unknown capability: ${capability}` });
+      }
+    } catch (err) {
+      resolve({ ok: false, error: String(err) });
+    }
+  });
+}
+
+ipcMain.handle('plugin:capability-request', async (_, pluginId: string, capability: string, args: unknown[]): Promise<{ ok: boolean; result?: unknown; error?: string }> => {
+  // Find the plugin to get its name and validate declared capabilities
+  const plugin = plugins.find(p => p.id === pluginId);
+  if (!plugin) return { ok: false, error: 'Unknown plugin' };
+  if (!plugin.capabilities.includes(capability)) {
+    return { ok: false, error: `Capability '${capability}' not declared in manifest` };
+  }
+
+  if (isCapabilityDenied(pluginId, capability)) {
+    return { ok: false, error: 'Permission denied' };
+  }
+
+  if (isCapabilityGranted(pluginId, capability)) {
+    return executeCapability(capability, args);
+  }
+
+  // Not yet decided — emit approval request to renderer and hold the response
+  const approvalId = `${pluginId}:${capability}:${Date.now()}:${Math.random().toString(36).slice(2)}`;
+  const req: PluginCapabilityRequest = {
+    id: approvalId,
+    pluginId,
+    pluginName: plugin.name,
+    capability,
+    timestamp: Date.now(),
+  };
+
+  return new Promise(resolve => {
+    pendingCapabilities.set(approvalId, { pluginId, capability, args, resolve });
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('hook:plugin-capability-request', req);
+    }
+  });
+});
+
+ipcMain.handle('plugin:capability-decide', async (_, approvalId: string, decision: 'allow' | 'allow-session' | 'deny') => {
+  const entry = pendingCapabilities.get(approvalId);
+  if (!entry) return;
+  pendingCapabilities.delete(approvalId);
+
+  const { pluginId, capability, args, resolve } = entry;
+
+  if (decision === 'allow') {
+    // Persist grant to folder settings
+    if (currentFolder) {
+      const settings = getFolderSettings(userDataPath, currentFolder);
+      const grants = { ...(settings.pluginGrants ?? {}) };
+      if (!grants[pluginId]) grants[pluginId] = [];
+      if (!grants[pluginId].includes(capability)) grants[pluginId] = [...grants[pluginId], capability];
+      saveFolderSetting(userDataPath, currentFolder, 'pluginGrants', grants);
+    }
+    resolve(await executeCapability(capability, args));
+  } else if (decision === 'allow-session') {
+    if (!sessionGrantedCapabilities.has(pluginId)) sessionGrantedCapabilities.set(pluginId, new Set());
+    sessionGrantedCapabilities.get(pluginId)!.add(capability);
+    resolve(await executeCapability(capability, args));
+  } else {
+    if (!sessionDeniedCapabilities.has(pluginId)) sessionDeniedCapabilities.set(pluginId, new Set());
+    sessionDeniedCapabilities.get(pluginId)!.add(capability);
+    resolve({ ok: false, error: 'Permission denied' });
+  }
+});
 
 // Clipboard
 ipcMain.handle('clipboard:read', () => clipboard.readText());

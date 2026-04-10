@@ -48,6 +48,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Panel plugin loading
   getPluginDescriptors: () => ipcRenderer.invoke('plugins:get-descriptors'),
 
+  // Plugin capability approval
+  pluginCapabilityRequest: (pluginId: string, capability: string, args: unknown[]) =>
+    ipcRenderer.invoke('plugin:capability-request', pluginId, capability, args),
+  pluginCapabilityDecide: (id: string, decision: string) =>
+    ipcRenderer.invoke('plugin:capability-decide', id, decision),
+  onPluginCapabilityRequest: (callback: (req: unknown) => void) =>
+    ipcRenderer.on('hook:plugin-capability-request', (_, req) => callback(req)),
+
   // Claude Code plugin dirs (launch screen)
   pickPluginDir: () => ipcRenderer.invoke('plugins:pick-dir'),
   getRecentPlugins: () => ipcRenderer.invoke('plugins:get-recent'),

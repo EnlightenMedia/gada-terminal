@@ -16,6 +16,7 @@ export interface FolderSettings {
   sidebarWidth?: number;
   launchOptions?: LaunchOptions;
   enabledPlugins?: string[];
+  pluginGrants?: Record<string, string[]>; // pluginId → permanently granted capabilities
 }
 
 export interface GlobalSettings {

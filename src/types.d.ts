@@ -7,7 +7,16 @@ export interface PluginDescriptor {
   name: string;
   version: string;
   permissions: string[];
+  capabilities: string[];
   entrySource: string;
+}
+
+export interface PluginCapabilityRequest {
+  id: string;
+  pluginId: string;
+  pluginName: string;
+  capability: string;
+  timestamp: number;
 }
 
 export interface ToolEvent {
@@ -79,6 +88,11 @@ declare global {
 
       // Panel plugin loading
       getPluginDescriptors: () => Promise<PluginDescriptor[]>;
+
+      // Plugin capability approval
+      pluginCapabilityRequest: (pluginId: string, capability: string, args: unknown[]) => Promise<{ ok: boolean; result?: unknown; error?: string }>;
+      pluginCapabilityDecide: (id: string, decision: 'allow' | 'allow-session' | 'deny') => Promise<void>;
+      onPluginCapabilityRequest: (callback: (req: PluginCapabilityRequest) => void) => void;
 
       // Claude Code plugin dirs (launch screen)
       pickPluginDir: () => Promise<string | null>;

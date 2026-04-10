@@ -1,7 +1,7 @@
 import '@xterm/xterm/css/xterm.css';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
-import type { LaunchOptions, FolderSettings, ToolEvent, ApiRequestEvent, PermissionRequest, PermissionDecision, PluginDescriptor } from './types';
+import type { LaunchOptions, FolderSettings, ToolEvent, ApiRequestEvent, PermissionRequest, PermissionDecision, PluginDescriptor, PluginCapabilityRequest } from './types';
 
 // ── Terminal setup ────────────────────────────────────────────────────────────
 
@@ -151,7 +151,7 @@ const hiddenSections: Set<string> = new Set(DEFAULT_HIDDEN);
 
 // Plugin panels
 const pluginSections: string[] = [];
-const pluginIframes = new Map<string, { iframe: HTMLIFrameElement; permissions: string[] }>();
+const pluginIframes = new Map<string, { iframe: HTMLIFrameElement; permissions: string[]; capabilities: string[] }>();
 
 function savePanelLayout(): void {
   window.electronAPI.setPanelLayout(selectedFolder ?? '', {
@@ -239,17 +239,37 @@ applyPanelState();
 function buildSrcdoc(desc: PluginDescriptor): string {
   const escaped = desc.entrySource.replace(/<\/script/gi, '<\\/script');
   const shim = `(function(){
-  var _l={};
+  var _l={},_p={};
+  function _req(capability,args){
+    return new Promise(function(resolve,reject){
+      var reqId=Math.random().toString(36).slice(2)+Date.now();
+      _p[reqId]={resolve:resolve,reject:reject};
+      window.parent.postMessage({type:'plugin:capability-request',capability:capability,args:args,reqId:reqId},'*');
+    });
+  }
   window.PanelAPI={
     version:'1',
     on:function(t,cb){if(!_l[t])_l[t]=[];_l[t].push(cb);},
     getTheme:function(){return{background:'#181818',backgroundSecondary:'#212121',textPrimary:'#e0e0e0',textMuted:'#666',accent:'#4ec94e',fontUi:"-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif",fontMono:"'Cascadia Code',Consolas,monospace"};},
     setTitle:function(t){window.parent.postMessage({type:'panel:setTitle',title:t},'*');},
     setHeight:function(px){window.parent.postMessage({type:'panel:setHeight',height:px},'*');},
+    emit:function(eventType,payload){window.parent.postMessage({type:'plugin:emit',eventType:eventType,payload:payload},'*');},
+    sendTerminalInput:function(text){return _req('terminal:write',[text]);},
+    sendClaudeMessage:function(text){return _req('claude:message',[text]);},
+    spawnProcess:function(cmd,args){return _req('process:spawn',[cmd,args||[]]);},
+    httpRequest:function(url,opts){return _req('http:request',[url,opts||{}]);},
   };
   window.addEventListener('message',function(e){
     if(!e.data||!e.data.type)return;
     var t=String(e.data.type);
+    if(t==='plugin:capability-response'){
+      var entry=_p[e.data.reqId];
+      if(!entry)return;
+      delete _p[e.data.reqId];
+      if(e.data.ok){entry.resolve(e.data.result);}
+      else{entry.reject(new Error(e.data.error||'Capability denied'));}
+      return;
+    }
     if(t.indexOf('event:')===0){
       var et=t.slice(6),cbs=_l[et]||[];
       for(var i=0;i<cbs.length;i++){try{cbs[i](e.data.payload);}catch(err){console.error('[Plugin ${desc.id}]',err);}}
@@ -316,16 +336,34 @@ function createPluginPanels(descriptors: PluginDescriptor[]): void {
     section.appendChild(body);
     sectionsContainer.appendChild(section);
 
-    pluginIframes.set(desc.id, { iframe, permissions: desc.permissions });
+    pluginIframes.set(desc.id, { iframe, permissions: desc.permissions, capabilities: desc.capabilities });
 
     // Handle postMessages from this plugin
     window.addEventListener('message', (e: MessageEvent) => {
       if (e.source !== iframe.contentWindow) return;
       if (!e.data || !e.data.type) return;
-      if (e.data.type === 'panel:setTitle') {
+      const msgType: string = e.data.type;
+      if (msgType === 'panel:setTitle') {
         title.textContent = String(e.data.title ?? desc.name);
-      } else if (e.data.type === 'panel:setHeight' && typeof e.data.height === 'number') {
+      } else if (msgType === 'panel:setHeight' && typeof e.data.height === 'number') {
         iframe.style.height = `${e.data.height}px`;
+      } else if (msgType === 'plugin:emit') {
+        // Broadcast to all other plugin iframes
+        for (const [otherId, { iframe: other }] of pluginIframes) {
+          if (otherId !== desc.id) {
+            other.contentWindow?.postMessage({
+              type: `event:${e.data.eventType}`,
+              payload: e.data.payload,
+            }, '*');
+          }
+        }
+      } else if (msgType === 'plugin:capability-request') {
+        const reqId: string = e.data.reqId;
+        const capability: string = e.data.capability;
+        const args: unknown[] = Array.isArray(e.data.args) ? e.data.args : [];
+        window.electronAPI.pluginCapabilityRequest(desc.id, capability, args).then(result => {
+          iframe.contentWindow?.postMessage({ type: 'plugin:capability-response', reqId, ...result }, '*');
+        });
       }
     });
   }
@@ -615,6 +653,88 @@ window.electronAPI.onPermissionRequest((req: PermissionRequest) => {
   }
   showPermissionsSection();
   const card = createPermCard(req);
+  permFeed.prepend(card);
+});
+
+// ── Plugin capability approval cards ─────────────────────────────────────────
+
+const CAPABILITY_LABELS: Record<string, string> = {
+  'terminal:write': 'Write to terminal',
+  'claude:message': 'Send Claude a message',
+  'process:spawn': 'Spawn a process',
+  'http:request': 'Make HTTP requests',
+};
+
+function createPluginCapabilityCard(req: PluginCapabilityRequest): HTMLElement {
+  const card = document.createElement('div');
+  card.className = 'perm-card';
+
+  const header = document.createElement('div');
+  header.className = 'perm-card-header';
+
+  const time = document.createElement('span');
+  time.className = 'perm-card-time';
+  time.textContent = formatTime(req.timestamp);
+
+  const name = document.createElement('span');
+  name.className = 'perm-card-name';
+  name.textContent = req.pluginName;
+
+  const badge = document.createElement('span');
+  badge.className = 'perm-badge pending';
+  badge.textContent = 'plugin';
+
+  header.appendChild(time);
+  header.appendChild(name);
+  header.appendChild(badge);
+
+  const detail = document.createElement('pre');
+  detail.className = 'perm-card-input';
+  detail.textContent = `Requesting: ${CAPABILITY_LABELS[req.capability] ?? req.capability}`;
+
+  const actions = document.createElement('div');
+  actions.className = 'perm-card-actions';
+
+  function decide(decision: 'allow' | 'allow-session' | 'deny', label: string, badgeClass: string): void {
+    card.remove();
+    // Reuse history entry pattern with pluginName as the "tool"
+    addPermHistory(
+      { id: req.id, toolName: `${req.pluginName} · ${req.capability}`, input: {}, timestamp: req.timestamp },
+      label,
+      badgeClass
+    );
+    window.electronAPI.pluginCapabilityDecide(req.id, decision);
+  }
+
+  const btnAllow = document.createElement('button');
+  btnAllow.className = 'perm-btn allow';
+  btnAllow.textContent = 'Allow';
+  btnAllow.addEventListener('click', () => decide('allow', 'allowed', 'allowed'));
+
+  const btnSession = document.createElement('button');
+  btnSession.className = 'perm-btn session';
+  btnSession.textContent = 'Session';
+  btnSession.addEventListener('click', () => decide('allow-session', 'session', 'session'));
+
+  const btnDeny = document.createElement('button');
+  btnDeny.className = 'perm-btn deny';
+  btnDeny.textContent = 'Deny';
+  btnDeny.addEventListener('click', () => decide('deny', 'denied', 'denied'));
+
+  actions.appendChild(btnAllow);
+  actions.appendChild(btnSession);
+  actions.appendChild(btnDeny);
+
+  card.appendChild(header);
+  card.appendChild(detail);
+  card.appendChild(actions);
+
+  return card;
+}
+
+window.electronAPI.onPluginCapabilityRequest((req: PluginCapabilityRequest) => {
+  showPermissionsSection();
+  const card = createPluginCapabilityCard(req);
   permFeed.prepend(card);
 });
 
