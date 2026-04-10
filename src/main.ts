@@ -137,6 +137,7 @@ function spawnClaude(args: string[], cwd: string): void {
   });
 
   ptyProcess.onExit(({ exitCode }: { exitCode: number }) => {
+    ptyProcess = null;
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send('terminal:exit', exitCode);
     }
