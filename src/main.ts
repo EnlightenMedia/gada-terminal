@@ -502,6 +502,30 @@ ipcMain.handle('plugin:capability-decide', async (_, approvalId: string, decisio
   }
 });
 
+// Plugin management
+ipcMain.on('plugin:set-disabled', (_, pluginId: string, disabled: boolean) => {
+  if (!currentFolder) return;
+  const settings = getFolderSettings(userDataPath, currentFolder);
+  const current = new Set(settings.disabledPlugins ?? []);
+  if (disabled) current.add(pluginId);
+  else current.delete(pluginId);
+  saveFolderSetting(userDataPath, currentFolder, 'disabledPlugins', [...current]);
+});
+
+ipcMain.on('plugin:revoke-grant', (_, pluginId: string, capability: string) => {
+  if (currentFolder) {
+    const settings = getFolderSettings(userDataPath, currentFolder);
+    const grants = { ...(settings.pluginGrants ?? {}) };
+    if (grants[pluginId]) {
+      grants[pluginId] = grants[pluginId].filter(c => c !== capability);
+      if (grants[pluginId].length === 0) delete grants[pluginId];
+      saveFolderSetting(userDataPath, currentFolder, 'pluginGrants', grants);
+    }
+  }
+  // Also clear any in-memory session grant
+  sessionGrantedCapabilities.get(pluginId)?.delete(capability);
+});
+
 // Clipboard
 ipcMain.handle('clipboard:read', () => clipboard.readText());
 ipcMain.handle('clipboard:write', (_, text: string) => clipboard.writeText(text));

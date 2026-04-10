@@ -56,6 +56,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onPluginCapabilityRequest: (callback: (req: unknown) => void) =>
     ipcRenderer.on('hook:plugin-capability-request', (_, req) => callback(req)),
 
+  // Plugin management
+  setPluginDisabled: (pluginId: string, disabled: boolean) =>
+    ipcRenderer.send('plugin:set-disabled', pluginId, disabled),
+  revokePluginGrant: (pluginId: string, capability: string) =>
+    ipcRenderer.send('plugin:revoke-grant', pluginId, capability),
+
   // Claude Code plugin dirs (launch screen)
   pickPluginDir: () => ipcRenderer.invoke('plugins:pick-dir'),
   getRecentPlugins: () => ipcRenderer.invoke('plugins:get-recent'),

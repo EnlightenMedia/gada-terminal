@@ -94,6 +94,10 @@ declare global {
       pluginCapabilityDecide: (id: string, decision: 'allow' | 'allow-session' | 'deny') => Promise<void>;
       onPluginCapabilityRequest: (callback: (req: PluginCapabilityRequest) => void) => void;
 
+      // Plugin management
+      setPluginDisabled: (pluginId: string, disabled: boolean) => void;
+      revokePluginGrant: (pluginId: string, capability: string) => void;
+
       // Claude Code plugin dirs (launch screen)
       pickPluginDir: () => Promise<string | null>;
       getRecentPlugins: () => Promise<string[]>;

@@ -150,6 +150,7 @@ let sectionOrder: string[] = [...ALL_SECTIONS];
 const hiddenSections: Set<string> = new Set(DEFAULT_HIDDEN);
 
 // Plugin panels
+let allDescriptors: PluginDescriptor[] = [];
 const pluginSections: string[] = [];
 const pluginIframes = new Map<string, { iframe: HTMLIFrameElement; permissions: string[]; capabilities: string[] }>();
 
@@ -871,6 +872,192 @@ window.electronAPI.onApiRequest((event: ApiRequestEvent) => {
   forwardToPlugins('hook:api-request', event);
 });
 
+// ── Plugin management overlay ─────────────────────────────────────────────────
+
+const pluginMgmtOverlay = document.getElementById('plugin-mgmt-overlay') as HTMLElement;
+const pluginMgmtList = document.getElementById('plugin-mgmt-list') as HTMLElement;
+const panelSections = document.getElementById('panel-sections') as HTMLElement;
+const btnPluginSettings = document.getElementById('btn-plugin-settings') as HTMLButtonElement;
+const btnPluginMgmtClose = document.getElementById('btn-plugin-mgmt-close') as HTMLButtonElement;
+
+const CAPABILITY_LABELS_MGMT: Record<string, string> = {
+  'terminal:write': 'terminal:write',
+  'claude:message': 'claude:message',
+  'process:spawn': 'process:spawn',
+  'http:request': 'http:request',
+};
+
+function openPluginMgmt(): void {
+  renderPluginMgmt();
+  panelSections.style.display = 'none';
+  pluginMgmtOverlay.classList.remove('hidden');
+  btnPluginSettings.classList.add('active');
+}
+
+function closePluginMgmt(): void {
+  pluginMgmtOverlay.classList.add('hidden');
+  panelSections.style.display = '';
+  btnPluginSettings.classList.remove('active');
+}
+
+function renderPluginMgmt(): void {
+  pluginMgmtList.innerHTML = '';
+
+  if (allDescriptors.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'plugin-mgmt-empty';
+    empty.textContent = 'No plugins installed.';
+    pluginMgmtList.appendChild(empty);
+    return;
+  }
+
+  const folderKey = selectedFolder ?? '';
+  const folderSettings = allFolderSettings[folderKey] ?? {};
+  const disabledSet = new Set(folderSettings.disabledPlugins ?? []);
+  const grants = folderSettings.pluginGrants ?? {};
+
+  for (const desc of allDescriptors) {
+    const isDisabled = disabledSet.has(desc.id);
+    const isActive = pluginIframes.has(desc.id); // currently running in this session
+
+    const row = document.createElement('div');
+    row.className = 'plugin-mgmt-row' + (isDisabled ? ' disabled' : '');
+
+    // Header: name, version, toggle
+    const header = document.createElement('div');
+    header.className = 'plugin-mgmt-row-header';
+
+    const nameEl = document.createElement('span');
+    nameEl.className = 'plugin-mgmt-name';
+    nameEl.textContent = desc.name;
+
+    const versionEl = document.createElement('span');
+    versionEl.className = 'plugin-mgmt-version';
+    versionEl.textContent = `v${desc.version}`;
+
+    // Toggle switch
+    const toggleLabel = document.createElement('label');
+    toggleLabel.className = 'plugin-toggle';
+    toggleLabel.title = isDisabled ? 'Enable plugin' : 'Disable plugin';
+
+    const toggleInput = document.createElement('input');
+    toggleInput.type = 'checkbox';
+    toggleInput.checked = !isDisabled;
+
+    const toggleSlider = document.createElement('span');
+    toggleSlider.className = 'plugin-toggle-slider';
+
+    toggleLabel.appendChild(toggleInput);
+    toggleLabel.appendChild(toggleSlider);
+
+    // Restart note (shown when user re-enables during a session)
+    const restartNote = document.createElement('div');
+    restartNote.className = 'plugin-restart-note';
+    restartNote.textContent = 'Restart to enable';
+    restartNote.style.display = 'none';
+
+    toggleInput.addEventListener('change', () => {
+      const nowDisabled = !toggleInput.checked;
+      row.classList.toggle('disabled', nowDisabled);
+
+      // Update in-memory folder settings
+      const current = new Set(allFolderSettings[folderKey]?.disabledPlugins ?? []);
+      if (nowDisabled) current.add(desc.id);
+      else current.delete(desc.id);
+      if (!allFolderSettings[folderKey]) allFolderSettings[folderKey] = {};
+      allFolderSettings[folderKey].disabledPlugins = [...current];
+
+      window.electronAPI.setPluginDisabled(desc.id, nowDisabled);
+
+      if (nowDisabled && isActive) {
+        // Remove panel from DOM and tracking immediately
+        document.getElementById(`section-${desc.id}`)?.remove();
+        document.querySelector<HTMLButtonElement>(`.panel-toggle-btn[data-section="${desc.id}"]`)?.remove();
+        const idx = sectionOrder.indexOf(desc.id);
+        if (idx >= 0) sectionOrder.splice(idx, 1);
+        const pIdx = pluginSections.indexOf(desc.id);
+        if (pIdx >= 0) pluginSections.splice(pIdx, 1);
+        pluginIframes.delete(desc.id);
+        savePanelLayout();
+      } else if (!nowDisabled && !isActive) {
+        // Plugin was disabled; re-enable needs restart
+        restartNote.style.display = '';
+        toggleLabel.title = 'Restart to enable';
+      } else if (!nowDisabled) {
+        restartNote.style.display = 'none';
+        toggleLabel.title = 'Disable plugin';
+      }
+    });
+
+    header.appendChild(nameEl);
+    header.appendChild(versionEl);
+    header.appendChild(toggleLabel);
+    row.appendChild(header);
+
+    // Show restart note if plugin is disabled but user just re-enabled (handled above),
+    // or if it's currently disabled (was disabled before session started)
+    if (isDisabled) {
+      restartNote.style.display = '';
+    }
+    row.appendChild(restartNote);
+
+    // Granted capabilities
+    const pluginGrants = grants[desc.id] ?? [];
+    if (pluginGrants.length > 0) {
+      const grantsEl = document.createElement('div');
+      grantsEl.className = 'plugin-grants';
+
+      const grantsLabel = document.createElement('div');
+      grantsLabel.className = 'plugin-grants-label';
+      grantsLabel.textContent = 'Granted';
+      grantsEl.appendChild(grantsLabel);
+
+      for (const cap of pluginGrants) {
+        const grantRow = document.createElement('div');
+        grantRow.className = 'plugin-grant-row';
+
+        const capLabel = document.createElement('span');
+        capLabel.className = 'plugin-grant-cap';
+        capLabel.textContent = CAPABILITY_LABELS_MGMT[cap] ?? cap;
+
+        const revokeBtn = document.createElement('button');
+        revokeBtn.className = 'plugin-grant-revoke';
+        revokeBtn.textContent = 'Revoke';
+        revokeBtn.addEventListener('click', () => {
+          window.electronAPI.revokePluginGrant(desc.id, cap);
+          // Update in-memory grants
+          const g = allFolderSettings[folderKey]?.pluginGrants ?? {};
+          if (g[desc.id]) {
+            g[desc.id] = g[desc.id].filter(c => c !== cap);
+            if (g[desc.id].length === 0) delete g[desc.id];
+          }
+          if (allFolderSettings[folderKey]) allFolderSettings[folderKey].pluginGrants = g;
+          grantRow.remove();
+          // If no grants left, remove the grants section
+          if (grantsEl.querySelectorAll('.plugin-grant-row').length === 0) {
+            grantsEl.remove();
+          }
+        });
+
+        grantRow.appendChild(capLabel);
+        grantRow.appendChild(revokeBtn);
+        grantsEl.appendChild(grantRow);
+      }
+
+      row.appendChild(grantsEl);
+    }
+
+    pluginMgmtList.appendChild(row);
+  }
+}
+
+btnPluginSettings.addEventListener('click', () => {
+  if (pluginMgmtOverlay.classList.contains('hidden')) openPluginMgmt();
+  else closePluginMgmt();
+});
+
+btnPluginMgmtClose.addEventListener('click', closePluginMgmt);
+
 // ── Launch screen ─────────────────────────────────────────────────────────────
 
 const launchScreen = document.getElementById('launch-screen') as HTMLElement;
@@ -1042,6 +1229,14 @@ function assembleArgs(): { args: string[]; cwd: string } {
 function launch(): void {
   launchedModel = optModel.value;
   const folderKey = selectedFolder ?? '';
+
+  // Create plugin panels now that the selected folder is known, filtering disabled plugins
+  const folderSettings = allFolderSettings[folderKey] ?? {};
+  const disabledSet = new Set(folderSettings.disabledPlugins ?? []);
+  createPluginPanels(allDescriptors.filter(d => !disabledSet.has(d.id)));
+  // Re-apply panel layout so saved order includes plugin sections
+  applySettings(folderSettings);
+
   const launchOptions: LaunchOptions = {
     resume: optResume.checked || undefined,
     continue: optContinue.checked || undefined,
@@ -1097,7 +1292,7 @@ extraArgsInput.addEventListener('keydown', (e: KeyboardEvent) => { if (e.key ===
     window.electronAPI.getPluginDescriptors(),
     window.electronAPI.getRecentPlugins(),
   ]);
-  createPluginPanels(descriptors);
+  allDescriptors = descriptors;
   allFolderSettings = settings;
   if (initialArgs.length > 0) extraArgsInput.value = initialArgs.join(' ');
   renderRecentFolders(recentFolders);

@@ -1049,6 +1049,181 @@
     ::-webkit-scrollbar-thumb:hover {
       background: #444;
     }
+
+    /* ── Plugin management overlay ── */
+
+    #plugin-mgmt-overlay {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    #plugin-mgmt-overlay.hidden { display: none; }
+
+    #plugin-mgmt-header {
+      display: flex;
+      align-items: center;
+      padding: 7px 12px;
+      border-bottom: 1px solid #222;
+      flex-shrink: 0;
+    }
+
+    .plugin-mgmt-title {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: #666;
+      flex: 1;
+    }
+
+    #btn-plugin-mgmt-close {
+      background: none;
+      border: none;
+      color: #555;
+      font-size: 18px;
+      cursor: pointer;
+      padding: 0 2px;
+      line-height: 1;
+    }
+    #btn-plugin-mgmt-close:hover { color: #aaa; }
+
+    #plugin-mgmt-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 6px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .plugin-mgmt-empty {
+      font-size: 11px;
+      color: #444;
+      text-align: center;
+      padding: 20px 0;
+      font-style: italic;
+    }
+
+    .plugin-mgmt-row {
+      background: #212121;
+      border: 1px solid #2e2e2e;
+      border-radius: 4px;
+      padding: 8px 10px;
+    }
+
+    .plugin-mgmt-row.disabled {
+      opacity: 0.5;
+    }
+
+    .plugin-mgmt-row-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .plugin-mgmt-name {
+      font-size: 12px;
+      font-weight: 600;
+      color: #ccc;
+      flex: 1;
+    }
+
+    .plugin-mgmt-version {
+      font-size: 10px;
+      color: #555;
+      font-family: var(--font-mono);
+    }
+
+    /* Toggle switch */
+    .plugin-toggle {
+      position: relative;
+      width: 28px;
+      height: 16px;
+      flex-shrink: 0;
+    }
+    .plugin-toggle input { opacity: 0; width: 0; height: 0; position: absolute; }
+    .plugin-toggle-slider {
+      position: absolute;
+      inset: 0;
+      background: #333;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .plugin-toggle-slider::before {
+      content: '';
+      position: absolute;
+      width: 10px;
+      height: 10px;
+      left: 3px;
+      top: 3px;
+      background: #555;
+      border-radius: 50%;
+      transition: transform 0.15s, background 0.15s;
+    }
+    .plugin-toggle input:checked + .plugin-toggle-slider { background: #1a3a1a; }
+    .plugin-toggle input:checked + .plugin-toggle-slider::before {
+      transform: translateX(12px);
+      background: #4ec94e;
+    }
+
+    .plugin-restart-note {
+      font-size: 10px;
+      color: #556655;
+      margin-top: 5px;
+      font-style: italic;
+    }
+
+    .plugin-grants {
+      margin-top: 8px;
+      border-top: 1px solid #2a2a2a;
+      padding-top: 6px;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .plugin-grants-label {
+      font-size: 10px;
+      font-weight: 600;
+      color: #555;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 2px;
+    }
+
+    .plugin-grant-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .plugin-grant-cap {
+      font-size: 11px;
+      color: #888;
+      flex: 1;
+      font-family: var(--font-mono);
+    }
+
+    .plugin-grant-revoke {
+      font-size: 10px;
+      font-weight: 600;
+      padding: 2px 6px;
+      border-radius: 3px;
+      border: 1px solid #5a2a2a;
+      background: #2e1a1a;
+      color: #e84e4e;
+      cursor: pointer;
+    }
+    .plugin-grant-revoke:hover { opacity: 0.8; }
+
+    .plugin-no-grants {
+      font-size: 10px;
+      color: #444;
+      font-style: italic;
+    }
   </style>
 </head>
 <body>
@@ -1156,6 +1331,7 @@
       <button class="panel-toggle-btn" data-section="permissions" title="Toggle Permissions">Perm</button>
       <button class="panel-toggle-btn" data-section="cost" title="Toggle Cost">Cost</button>
       <button class="panel-toggle-btn" data-section="context" title="Toggle Context">Ctx</button>
+      <button id="btn-plugin-settings" class="panel-toggle-btn" title="Manage plugins" style="margin-left:auto">Plugins</button>
     </div>
     <div id="panel-sections">
       <div class="panel-section" id="section-tools" draggable="true" data-section-id="tools">
@@ -1217,6 +1393,15 @@
         </div>
         <div class="panel-section-body" id="context-feed"></div>
       </div>
+    </div>
+
+    <!-- Plugin management overlay -->
+    <div id="plugin-mgmt-overlay" class="hidden">
+      <div id="plugin-mgmt-header">
+        <span class="plugin-mgmt-title">Plugins</span>
+        <button id="btn-plugin-mgmt-close">×</button>
+      </div>
+      <div id="plugin-mgmt-list"></div>
     </div>
   </div>
 
