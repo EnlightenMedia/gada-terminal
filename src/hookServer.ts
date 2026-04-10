@@ -244,14 +244,15 @@ function parseOtlpLogs(body: string, onApiRequest: (event: ApiRequestEvent) => v
 
         if (attrs['event.name'] !== 'api_request') continue;
 
-        const inputTokens    = numAttr(attrs, 'input_tokens');
-        const outputTokens   = numAttr(attrs, 'output_tokens');
+        const inputTokens      = numAttr(attrs, 'input_tokens');
+        const outputTokens     = numAttr(attrs, 'output_tokens');
         const cacheReadTokens  = numAttr(attrs, 'cache_read_tokens');
         const cacheWriteTokens = numAttr(attrs, 'cache_creation_tokens');
-        const model  = strAttr(attrs, 'model');
-        const costUsd = numAttr(attrs, 'cost_usd');
+        const model            = strAttr(attrs, 'model');
+        const costUsd          = numAttr(attrs, 'cost_usd');
+        const durationMs       = numAttr(attrs, 'duration_ms');
 
-        onApiRequest({ timestamp: Date.now(), model, inputTokens, outputTokens, cacheReadTokens, cacheWriteTokens, costUsd });
+        onApiRequest({ timestamp: Date.now(), model, inputTokens, outputTokens, cacheReadTokens, cacheWriteTokens, costUsd, durationMs });
       }
     }
   }

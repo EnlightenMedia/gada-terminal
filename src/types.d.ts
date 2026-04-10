@@ -28,6 +28,7 @@ export interface ApiRequestEvent {
   cacheReadTokens: number;
   cacheWriteTokens: number;
   costUsd: number;
+  durationMs: number;
 }
 
 export type PermissionDecision = 'allow' | 'allow-session' | 'deny' | 'passthrough';
