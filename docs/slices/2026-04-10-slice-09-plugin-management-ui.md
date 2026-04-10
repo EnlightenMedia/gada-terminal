@@ -1,7 +1,7 @@
 # Slice 9 — Plugin Management UI
 
 **Roadmap:** docs/roadmaps/2026-04-06-gada-terminal.md
-**Status:** [ ] Not started
+**Status:** [x] Complete
 
 ## Objective
 
@@ -31,13 +31,13 @@ A settings screen lists installed plugins with name, version, enabled/disabled t
 
 ## Done Criteria
 
-- [ ] A button in the sidebar opens the plugin management overlay
-- [ ] The overlay lists every installed plugin with name and version
-- [ ] A plugin can be disabled via toggle — its panel disappears from the sidebar immediately
-- [ ] After disabling and restarting, the disabled plugin's panel does not appear
-- [ ] A disabled plugin shows a "restart to enable" note when toggled back on — it does not re-appear in the current session
-- [ ] After restarting with the plugin re-enabled, its panel appears normally
-- [ ] Granted capabilities are listed per plugin with a Revoke button
-- [ ] Revoking a grant causes the next use of that capability to show the approval card again
-- [ ] A plugin with no grants shows no revocable entries (not an empty list with a heading)
-- [ ] The overlay can be closed and the sidebar returns to its previous state
+- [x] A button in the sidebar opens the plugin management overlay
+- [x] The overlay lists every installed plugin with name and version
+- [x] A plugin can be disabled via toggle — its panel disappears from the sidebar immediately
+- [x] After disabling and restarting, the disabled plugin's panel does not appear
+- [x] A disabled plugin shows a "restart to enable" note when toggled back on — it does not re-appear in the current session
+- [x] After restarting with the plugin re-enabled, its panel appears normally
+- [x] Granted capabilities are listed per plugin with a Revoke button
+- [x] Revoking a grant causes the next use of that capability to show the approval card again
+- [x] A plugin with no grants shows no revocable entries (not an empty list with a heading)
+- [x] The overlay can be closed and the sidebar returns to its previous state
