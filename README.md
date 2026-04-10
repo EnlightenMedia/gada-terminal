@@ -38,9 +38,9 @@ npm run make
 | Build | Electron Forge + Vite |
 | Language | TypeScript |
 
-## Plugin Development
+## Widget Development
 
-Plugins are directories containing a `plugin.json` manifest and an `index.js` entry file. The entry file runs in a sandboxed iframe and communicates with the host via `postMessage` and the `PanelAPI`. See the [plugin authoring guide](plugins/PANEL_PLUGIN_AUTHORING.md) for the full API reference and a working example.
+Widgets are directories containing a `widget.json` manifest and an `index.js` entry file. The entry file runs in a sandboxed iframe and communicates with the host via `postMessage` and the `WidgetAPI`. See the [widget authoring guide](WIDGET_AUTHORING.md) for the full API reference and a working example.
 
 ## Roadmap
 
