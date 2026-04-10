@@ -671,15 +671,22 @@ function fmtTokensFull(n: number): string {
 
 let launchedModel = '';
 
+// Models (or prefixes) known to have a 1M token context window.
+// Claude Opus 4.x ships with 1M context by default; the [1m] suffix is just
+// a Claude Code display alias and does not appear in OTLP model IDs.
+const MODELS_1M = [
+  'claude-opus-4',   // covers claude-opus-4-5, claude-opus-4-6, future 4.x
+];
+
 function getContextWindow(model: string): number {
-  // OTLP emits the raw API model ID which may not carry the [1m] suffix used
-  // in Claude Code's display alias (e.g. 'claude-opus-4-6[1m]'). Fall back to
-  // the launch-time model as a hint — but only when the OTLP model still refers
-  // to the same base model. If the user switches to a different model family
-  // mid-session, the OTLP model will no longer match and the hint is ignored.
-  if (model.includes('[1m]')) return 1_000_000;
-  if (launchedModel.includes('[1m]')) {
-    const launchBase = launchedModel.replace(/\[.*$/, ''); // e.g. 'claude-opus-4-6'
+  const check = (m: string) =>
+    m.includes('[1m]') || MODELS_1M.some(prefix => m.includes(prefix));
+
+  if (check(model)) return 1_000_000;
+  // Fall back to the model entered at launch time in case OTLP still reports
+  // the same base model but without the [1m] display alias.
+  if (launchedModel && check(launchedModel)) {
+    const launchBase = launchedModel.replace(/\[.*$/, '');
     if (model.includes(launchBase)) return 1_000_000;
   }
   return 200_000;
