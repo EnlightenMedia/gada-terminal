@@ -1392,13 +1392,8 @@ function launch(): void {
   launchedModel = optModel.value;
   const folderKey = selectedFolder ?? '';
 
-  // Create widget panels now that the selected folder is known, filtering disabled widgets
-  const folderSettings = allFolderSettings[folderKey] ?? {};
-  const disabledSet = new Set(folderSettings.disabledWidgets ?? []);
-  createWidgetPanels(allDescriptors.filter(d => !disabledSet.has(d.id)));
-  // Re-apply panel layout so saved order includes widget sections
-  applySettings(folderSettings);
-
+  // Snapshot form state before applySettings overwrites it with persisted values
+  const { args, cwd } = assembleArgs();
   const launchOptions: LaunchOptions = {
     resume: optResume.checked || undefined,
     continue: optContinue.checked || undefined,
@@ -1408,6 +1403,14 @@ function launch(): void {
     pluginDirs: selectedPluginDirs.length > 0 ? selectedPluginDirs : undefined,
     extraArgs: extraArgsInput.value.trim() || undefined,
   };
+
+  // Create widget panels now that the selected folder is known, filtering disabled widgets
+  const folderSettings = allFolderSettings[folderKey] ?? {};
+  const disabledSet = new Set(folderSettings.disabledWidgets ?? []);
+  createWidgetPanels(allDescriptors.filter(d => !disabledSet.has(d.id)));
+  // Re-apply panel layout so saved order includes widget sections
+  applySettings(folderSettings);
+
   if (selectedPluginDirs.length > 0) {
     window.electronAPI.addRecentPlugins(selectedPluginDirs);
   }
@@ -1422,7 +1425,6 @@ function launch(): void {
     : 'Gada Terminal';
   titlebarText.textContent = folderName;
 
-  const { args, cwd } = assembleArgs();
   launchScreen.classList.add('hidden');
 
   requestAnimationFrame(() => {
