@@ -296,9 +296,11 @@ function createPluginPanels(descriptors: PluginDescriptor[]): void {
 
   const toggleBar = document.getElementById('panel-toggle-bar')!;
   const sectionsContainer = document.getElementById('panel-sections')!;
+  const newIds: string[] = [];
 
   for (const desc of descriptors) {
     pluginSections.push(desc.id);
+    newIds.push(desc.id);
 
     // Toggle button
     const btn = document.createElement('button');
@@ -369,7 +371,7 @@ function createPluginPanels(descriptors: PluginDescriptor[]): void {
     });
   }
 
-  sectionOrder = [...sectionOrder, ...pluginSections];
+  sectionOrder = [...sectionOrder, ...newIds];
 }
 
 function forwardToPlugins(eventType: string, payload: unknown): void {
@@ -887,7 +889,11 @@ const CAPABILITY_LABELS_MGMT: Record<string, string> = {
   'http:request': 'http:request',
 };
 
-function openPluginMgmt(): void {
+async function openPluginMgmt(): Promise<void> {
+  // Always fetch fresh settings so in-session grants are visible
+  if (selectedFolder) {
+    allFolderSettings[selectedFolder] = await window.electronAPI.getFolderSettings(selectedFolder);
+  }
   renderPluginMgmt();
   panelSections.style.display = 'none';
   pluginMgmtOverlay.classList.remove('hidden');
@@ -918,7 +924,6 @@ function renderPluginMgmt(): void {
 
   for (const desc of allDescriptors) {
     const isDisabled = disabledSet.has(desc.id);
-    const isActive = pluginIframes.has(desc.id); // currently running in this session
 
     const row = document.createElement('div');
     row.className = 'plugin-mgmt-row' + (isDisabled ? ' disabled' : '');
@@ -935,7 +940,6 @@ function renderPluginMgmt(): void {
     versionEl.className = 'plugin-mgmt-version';
     versionEl.textContent = `v${desc.version}`;
 
-    // Toggle switch
     const toggleLabel = document.createElement('label');
     toggleLabel.className = 'plugin-toggle';
     toggleLabel.title = isDisabled ? 'Enable plugin' : 'Disable plugin';
@@ -946,31 +950,24 @@ function renderPluginMgmt(): void {
 
     const toggleSlider = document.createElement('span');
     toggleSlider.className = 'plugin-toggle-slider';
-
     toggleLabel.appendChild(toggleInput);
     toggleLabel.appendChild(toggleSlider);
-
-    // Restart note (shown when user re-enables during a session)
-    const restartNote = document.createElement('div');
-    restartNote.className = 'plugin-restart-note';
-    restartNote.textContent = 'Restart to enable';
-    restartNote.style.display = 'none';
 
     toggleInput.addEventListener('change', () => {
       const nowDisabled = !toggleInput.checked;
       row.classList.toggle('disabled', nowDisabled);
+      toggleLabel.title = nowDisabled ? 'Enable plugin' : 'Disable plugin';
 
-      // Update in-memory folder settings
+      // Persist
       const current = new Set(allFolderSettings[folderKey]?.disabledPlugins ?? []);
       if (nowDisabled) current.add(desc.id);
       else current.delete(desc.id);
       if (!allFolderSettings[folderKey]) allFolderSettings[folderKey] = {};
       allFolderSettings[folderKey].disabledPlugins = [...current];
-
       window.electronAPI.setPluginDisabled(desc.id, nowDisabled);
 
-      if (nowDisabled && isActive) {
-        // Remove panel from DOM and tracking immediately
+      if (nowDisabled && pluginIframes.has(desc.id)) {
+        // Remove panel from DOM immediately
         document.getElementById(`section-${desc.id}`)?.remove();
         document.querySelector<HTMLButtonElement>(`.panel-toggle-btn[data-section="${desc.id}"]`)?.remove();
         const idx = sectionOrder.indexOf(desc.id);
@@ -979,13 +976,10 @@ function renderPluginMgmt(): void {
         if (pIdx >= 0) pluginSections.splice(pIdx, 1);
         pluginIframes.delete(desc.id);
         savePanelLayout();
-      } else if (!nowDisabled && !isActive) {
-        // Plugin was disabled; re-enable needs restart
-        restartNote.style.display = '';
-        toggleLabel.title = 'Restart to enable';
-      } else if (!nowDisabled) {
-        restartNote.style.display = 'none';
-        toggleLabel.title = 'Disable plugin';
+      } else if (!nowDisabled && !pluginIframes.has(desc.id)) {
+        // Re-enable: inject panel immediately, no restart required
+        createPluginPanels([desc]);
+        applyPanelState();
       }
     });
 
@@ -993,13 +987,6 @@ function renderPluginMgmt(): void {
     header.appendChild(versionEl);
     header.appendChild(toggleLabel);
     row.appendChild(header);
-
-    // Show restart note if plugin is disabled but user just re-enabled (handled above),
-    // or if it's currently disabled (was disabled before session started)
-    if (isDisabled) {
-      restartNote.style.display = '';
-    }
-    row.appendChild(restartNote);
 
     // Granted capabilities
     const pluginGrants = grants[desc.id] ?? [];
@@ -1025,7 +1012,6 @@ function renderPluginMgmt(): void {
         revokeBtn.textContent = 'Revoke';
         revokeBtn.addEventListener('click', () => {
           window.electronAPI.revokePluginGrant(desc.id, cap);
-          // Update in-memory grants
           const g = allFolderSettings[folderKey]?.pluginGrants ?? {};
           if (g[desc.id]) {
             g[desc.id] = g[desc.id].filter(c => c !== cap);
@@ -1033,10 +1019,7 @@ function renderPluginMgmt(): void {
           }
           if (allFolderSettings[folderKey]) allFolderSettings[folderKey].pluginGrants = g;
           grantRow.remove();
-          // If no grants left, remove the grants section
-          if (grantsEl.querySelectorAll('.plugin-grant-row').length === 0) {
-            grantsEl.remove();
-          }
+          if (grantsEl.querySelectorAll('.plugin-grant-row').length === 0) grantsEl.remove();
         });
 
         grantRow.appendChild(capLabel);
@@ -1052,7 +1035,7 @@ function renderPluginMgmt(): void {
 }
 
 btnPluginSettings.addEventListener('click', () => {
-  if (pluginMgmtOverlay.classList.contains('hidden')) openPluginMgmt();
+  if (pluginMgmtOverlay.classList.contains('hidden')) void openPluginMgmt();
   else closePluginMgmt();
 });
 
