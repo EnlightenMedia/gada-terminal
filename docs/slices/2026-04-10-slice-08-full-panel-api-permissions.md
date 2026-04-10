@@ -1,7 +1,7 @@
 # Slice 8 — Full PanelAPI & Permissions
 
 **Roadmap:** docs/roadmaps/2026-04-06-gada-terminal.md
-**Status:** [ ] Not started
+**Status:** [x] Complete
 
 ## Objective
 
@@ -35,12 +35,12 @@ The PanelAPI gains write capabilities — terminal input, Claude messages, proce
 
 ## Done Criteria
 
-- [ ] A plugin declaring `capabilities` in its manifest loads without error; one without the field also loads without error
-- [ ] When a plugin calls a write method for the first time, an approval card appears in the sidebar and the write operation is held until the user responds
-- [ ] Clicking Allow executes the operation and persists the grant; the plugin is not prompted again in the same session or after restart
-- [ ] Clicking Allow for session executes the operation but does not persist — the plugin is prompted again after restart
-- [ ] Clicking Deny returns an error to the plugin and does not execute the operation; the plugin is prompted again next time it tries
-- [ ] A plugin that has been granted `terminal:write` can write text to the terminal after approval
-- [ ] Grants survive app restart — a previously-approved plugin does not re-prompt
-- [ ] A plugin that has not declared a capability in its manifest and attempts to use it receives an error; no approval card is shown
-- [ ] `PANEL_PLUGIN_AUTHORING.md` exists and documents the full API surface
+- [x] A plugin declaring `capabilities` in its manifest loads without error; one without the field also loads without error
+- [x] When a plugin calls a write method for the first time, an approval card appears in the sidebar and the write operation is held until the user responds
+- [x] Clicking Allow executes the operation and persists the grant; the plugin is not prompted again in the same session or after restart
+- [x] Clicking Allow for session executes the operation but does not persist — the plugin is prompted again after restart
+- [x] Clicking Deny returns an error to the plugin and does not execute the operation; the plugin is prompted again next time it tries
+- [x] A plugin that has been granted `terminal:write` can write text to the terminal after approval
+- [x] Grants survive app restart — a previously-approved plugin does not re-prompt
+- [x] A plugin that has not declared a capability in its manifest and attempts to use it receives an error; no approval card is shown
+- [x] `PANEL_PLUGIN_AUTHORING.md` exists and documents the full API surface
