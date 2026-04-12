@@ -1,6 +1,6 @@
 {
   "id": "example-panel",
-  "name": "Tool Count",
+  "name": "Test Widget",
   "version": "1.1.0",
   "description": "Shows a count of each tool invoked during the session. Demonstrates terminal write capability.",
   "entry": "index.js",

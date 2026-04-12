@@ -49,7 +49,7 @@
   });
   document.body.appendChild(writeBtn);
 
-  window.WidgetAPI.setTitle('Tool Count');
+  window.WidgetAPI.setTitle('Test Widget');
 
   window.WidgetAPI.on('hook:tool-event', function (event) {
     if (event.event !== 'PreToolUse') return;
