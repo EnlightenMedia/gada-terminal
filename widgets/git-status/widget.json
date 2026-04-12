@@ -1,0 +1,9 @@
+{
+  "id": "git-status",
+  "name": "Git Status",
+  "version": "1.0.0",
+  "description": "Shows git status and recent commits for the current project directory. Requires process:spawn.",
+  "entry": "index.js",
+  "permissions": [],
+  "capabilities": ["process:spawn"]
+}
