@@ -116,6 +116,20 @@ WidgetAPI.on('hook:tool-event', function(event) {
 }
 ```
 
+#### `WidgetAPI.getContext()` → `Promise<string>`
+
+Returns the working directory selected on the launch screen for the active
+session. Use this to scope data or commands to the current project.
+
+```js
+WidgetAPI.getContext().then(function(cwd) {
+  console.log('Project folder:', cwd);
+});
+```
+
+No capability declaration required. No approval prompt. Returns an empty
+string if called before a session is started.
+
 #### `WidgetAPI.getTheme()`
 
 Returns the current UI theme as a plain object.

@@ -1,6 +1,16 @@
 (function () {
   var counts = {};
 
+  var cwdEl = document.createElement('p');
+  cwdEl.style.cssText = 'color:#555;font-size:10px;padding:0 0 6px 0;word-break:break-all;border-bottom:1px solid #242424;margin-bottom:6px;';
+  cwdEl.textContent = 'Loading context…';
+  document.body.appendChild(cwdEl);
+
+  window.WidgetAPI.getContext().then(function (cwd) {
+    cwdEl.textContent = cwd || '(no folder selected)';
+    cwdEl.style.color = '#4ec94e';
+  });
+
   var list = document.createElement('ul');
   list.style.cssText = 'list-style:none;padding:0;margin:0;';
   document.body.appendChild(list);

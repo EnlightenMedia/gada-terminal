@@ -346,6 +346,7 @@ function buildSrcdoc(desc: WidgetDescriptor): string {
     sendClaudeMessage:function(text){return _req('claude:message',[text]);},
     spawnProcess:function(cmd,args){return _req('process:spawn',[cmd,args||[]]);},
     httpRequest:function(url,opts){return _req('http:request',[url,opts||{}]);},
+    getContext:function(){return new Promise(function(res,rej){var reqId=Math.random().toString(36).slice(2)+Date.now();_p[reqId]={resolve:res,reject:rej};window.parent.postMessage({type:'widget:context-request',reqId:reqId},'*');});},
   };
   window.addEventListener('message',function(e){
     if(!e.data||!e.data.type)return;
@@ -356,6 +357,13 @@ function buildSrcdoc(desc: WidgetDescriptor): string {
       delete _p[e.data.reqId];
       if(e.data.ok){entry.resolve(e.data.result);}
       else{entry.reject(new Error(e.data.error||'Capability denied'));}
+      return;
+    }
+    if(t==='widget:context-response'){
+      var ctxEntry=_p[e.data.reqId];
+      if(!ctxEntry)return;
+      delete _p[e.data.reqId];
+      ctxEntry.resolve(e.data.cwd);
       return;
     }
     if(t.indexOf('event:')===0){
@@ -444,6 +452,12 @@ function createWidgetPanels(descriptors: WidgetDescriptor[]): void {
         window.electronAPI.widgetCapabilityRequest(desc.id, capability, args).then(result => {
           iframe.contentWindow?.postMessage({ type: 'widget:capability-response', reqId, ...result }, '*');
         });
+      } else if (msgType === 'widget:context-request') {
+        iframe.contentWindow?.postMessage({
+          type: 'widget:context-response',
+          reqId: e.data.reqId,
+          cwd: selectedFolder ?? '',
+        }, '*');
       }
     });
   }
