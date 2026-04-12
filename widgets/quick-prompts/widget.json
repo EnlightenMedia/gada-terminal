@@ -1,0 +1,9 @@
+{
+  "id": "quick-prompts",
+  "name": "Quick Prompts",
+  "version": "1.0.0",
+  "description": "Saved prompt snippets that send to Claude in one click. Supports user-level and project-level prompts.",
+  "entry": "index.js",
+  "permissions": [],
+  "capabilities": ["claude:message"]
+}
