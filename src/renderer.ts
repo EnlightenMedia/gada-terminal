@@ -176,8 +176,8 @@ sidebarLeftResizeHandle.addEventListener('mousedown', (e) => {
 
 // ── Panel (sidebar) ───────────────────────────────────────────────────────────
 
-const ALL_SECTIONS = ['tools', 'permissions', 'cost', 'context'];
-const DEFAULT_HIDDEN = new Set(['permissions', 'cost', 'context']);
+const ALL_SECTIONS = ['tools', 'errors', 'permissions', 'cost', 'context'];
+const DEFAULT_HIDDEN = new Set(['errors', 'permissions', 'cost', 'context']);
 
 let sectionOrder: string[] = [...ALL_SECTIONS];
 const hiddenSections: Set<string> = new Set(DEFAULT_HIDDEN);
@@ -190,6 +190,7 @@ const widgetIframes = new Map<string, { iframe: HTMLIFrameElement; permissions: 
 
 const sectionNames = new Map<string, string>([
   ['tools',       'Tools'],
+  ['errors',      'Errors'],
   ['permissions', 'Permissions'],
   ['cost',        'Cost'],
   ['context',     'Context'],
@@ -578,9 +579,78 @@ window.electronAPI.onToolEvent((event: ToolEvent) => {
   } else {
     const card = toolCardMap.get(event.id);
     if (card) updateToolCard(card, event);
+
+    if (event.event === 'PostToolUseFailure') {
+      const errCard = createErrorCard(event);
+      errorsFeed.prepend(errCard);
+      liveErrorCards.unshift(errCard);
+
+      while (liveErrorCards.length > MAX_LIVE_ERRORS) {
+        const oldest = liveErrorCards.pop()!;
+        oldest.remove();
+        errorPopupList.prepend(oldest);
+      }
+    }
   }
   forwardToWidgets('hook:tool-event', event);
 });
+
+// ── Error log ─────────────────────────────────────────────────────────────────
+
+const errorsFeed          = document.getElementById('errors-feed')          as HTMLElement;
+const errorHistoryPopup   = document.getElementById('error-history-popup')  as HTMLElement;
+const errorPopupList      = document.getElementById('error-popup-list')     as HTMLElement;
+const errorPopupClose     = document.getElementById('error-popup-close')    as HTMLElement;
+const errorPopupBackdrop  = document.getElementById('error-popup-backdrop') as HTMLElement;
+const btnErrorHistory     = document.getElementById('btn-error-history')    as HTMLButtonElement;
+
+btnErrorHistory.addEventListener('click', () => errorHistoryPopup.classList.remove('hidden'));
+errorPopupClose.addEventListener('click', () => errorHistoryPopup.classList.add('hidden'));
+errorPopupBackdrop.addEventListener('click', () => errorHistoryPopup.classList.add('hidden'));
+
+const MAX_LIVE_ERRORS = 3;
+const liveErrorCards: HTMLElement[] = []; // ordered newest-first, mirrors errorsFeed DOM
+
+function createErrorCard(event: ToolEvent): HTMLElement {
+  const card = document.createElement('div');
+  card.className = 'tool-card';
+
+  const header = document.createElement('div');
+  header.className = 'tool-card-header';
+
+  const time = document.createElement('span');
+  time.className = 'tool-card-time';
+  time.textContent = formatTime(event.timestamp);
+
+  const name = document.createElement('span');
+  name.className = 'tool-card-name';
+  name.textContent = event.toolName;
+
+  const badge = document.createElement('span');
+  badge.className = 'tool-badge failed';
+  badge.textContent = 'failed';
+
+  header.appendChild(time);
+  header.appendChild(name);
+  header.appendChild(badge);
+
+  const target = document.createElement('div');
+  target.className = 'tool-card-target';
+  target.textContent = event.error ?? '(no error message)';
+
+  const details = document.createElement('div');
+  details.className = 'tool-card-details';
+  details.textContent = JSON.stringify(event.input, null, 2)
+    + (event.error ? `\n\n--- Error ---\n${event.error}` : '');
+
+  card.appendChild(header);
+  card.appendChild(target);
+  card.appendChild(details);
+
+  card.addEventListener('click', () => card.classList.toggle('expanded'));
+
+  return card;
+}
 
 // ── Permission cards ──────────────────────────────────────────────────────────
 
@@ -1403,6 +1473,11 @@ function launch(): void {
     pluginDirs: selectedPluginDirs.length > 0 ? selectedPluginDirs : undefined,
     extraArgs: extraArgsInput.value.trim() || undefined,
   };
+
+  // Clear error log from any previous session
+  errorsFeed.innerHTML = '';
+  errorPopupList.innerHTML = '';
+  liveErrorCards.length = 0;
 
   // Create widget panels now that the selected folder is known, filtering disabled widgets
   const folderSettings = allFolderSettings[folderKey] ?? {};

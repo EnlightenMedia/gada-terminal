@@ -1461,6 +1461,13 @@
           </div>
           <div class="panel-section-body" id="tools-feed"></div>
         </div>
+        <div class="panel-section hidden" id="section-errors" draggable="true" data-section-id="errors">
+          <div class="panel-section-header">
+            <span class="panel-section-title">Errors</span>
+            <button id="btn-error-history" class="perm-history-btn">History</button>
+          </div>
+          <div class="panel-section-body" id="errors-feed"></div>
+        </div>
         <div class="panel-section hidden" id="section-permissions" draggable="true" data-section-id="permissions">
           <div class="panel-section-header">
             <span class="panel-section-title">Permissions</span>
@@ -1527,6 +1534,18 @@
         <button id="btn-widget-mgmt-close">×</button>
       </div>
       <div id="widget-mgmt-list"></div>
+    </div>
+  </div>
+
+  <!-- Error log history popup -->
+  <div id="error-history-popup" class="perm-popup hidden">
+    <div class="perm-popup-backdrop" id="error-popup-backdrop"></div>
+    <div class="perm-popup-card" style="width:420px">
+      <div class="perm-popup-header">
+        <span>Error History</span>
+        <button id="error-popup-close">×</button>
+      </div>
+      <div class="perm-popup-list" id="error-popup-list" style="padding:6px;display:flex;flex-direction:column;gap:4px;"></div>
     </div>
   </div>
 
