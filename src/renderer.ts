@@ -188,6 +188,14 @@ let allDescriptors: WidgetDescriptor[] = [];
 const widgetSections: string[] = [];
 const widgetIframes = new Map<string, { iframe: HTMLIFrameElement; permissions: string[]; capabilities: string[] }>();
 
+interface ActiveDialog {
+  reqId: string;
+  widgetIframe: HTMLIFrameElement;
+  overlay: HTMLElement;
+  dialogIframe: HTMLIFrameElement;
+}
+let activeDialog: ActiveDialog | null = null;
+
 const sectionNames = new Map<string, string>([
   ['tools',       'Tools'],
   ['errors',      'Errors'],
@@ -346,6 +354,7 @@ function buildSrcdoc(desc: WidgetDescriptor): string {
     sendClaudeMessage:function(text){return _req('claude:message',[text]);},
     spawnProcess:function(cmd,args){return _req('process:spawn',[cmd,args||[]]);},
     httpRequest:function(url,opts){return _req('http:request',[url,opts||{}]);},
+    openDialog:function(script){return new Promise(function(res,rej){var reqId=Math.random().toString(36).slice(2)+Date.now();_p[reqId]={resolve:res,reject:rej};window.parent.postMessage({type:'widget:dialog-open',script:script,reqId:reqId},'*');});},
     getContext:function(){return new Promise(function(res,rej){var reqId=Math.random().toString(36).slice(2)+Date.now();_p[reqId]={resolve:res,reject:rej};window.parent.postMessage({type:'widget:context-request',reqId:reqId},'*');});},
     storage:{
       get:function(key){return new Promise(function(res,rej){var reqId=Math.random().toString(36).slice(2)+Date.now();_p[reqId]={resolve:res,reject:rej};window.parent.postMessage({type:'widget:storage-get',key:key,reqId:reqId},'*');});},
@@ -377,6 +386,13 @@ function buildSrcdoc(desc: WidgetDescriptor): string {
       stEntry.resolve(e.data.value);
       return;
     }
+    if(t==='widget:dialog-response'){
+      var dlgEntry=_p[e.data.reqId];
+      if(!dlgEntry)return;
+      delete _p[e.data.reqId];
+      dlgEntry.resolve(e.data.result);
+      return;
+    }
     if(t.indexOf('event:')===0){
       var et=t.slice(6),cbs=_l[et]||[];
       for(var i=0;i<cbs.length;i++){try{cbs[i](e.data.payload);}catch(err){console.error('[Widget${desc.id}]',err);}}
@@ -396,6 +412,64 @@ function buildSrcdoc(desc: WidgetDescriptor): string {
     '</body></html>',
   ].join('\n');
 }
+
+function buildDialogSrcdoc(script: string): string {
+  const escaped = script.replace(/<\/script/gi, '<\\/script');
+  const shim = `(function(){
+  window.DialogAPI={
+    getTheme:function(){return{background:'#181818',backgroundSecondary:'#212121',textPrimary:'#e0e0e0',textMuted:'#666',accent:'#4ec94e',fontUi:"-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif",fontMono:"'Cascadia Code',Consolas,monospace"};},
+    close:function(result){window.parent.postMessage({type:'dialog:close',result:result},'*');}
+  };
+})();`;
+  return [
+    '<!DOCTYPE html><html><head><meta charset="UTF-8">',
+    '<style>',
+    '*{box-sizing:border-box;margin:0;padding:0;}',
+    'body{background:#1c1c1c;color:#e0e0e0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-size:12px;padding:12px;overflow-y:auto;}',
+    '::-webkit-scrollbar{width:6px;}::-webkit-scrollbar-track{background:transparent;}::-webkit-scrollbar-thumb{background:#444;border-radius:3px;}',
+    '</style></head><body>',
+    '<script>', shim, '</script>',
+    '<script>', escaped, '</script>',
+    '</body></html>',
+  ].join('\n');
+}
+
+function openWidgetDialog(reqId: string, script: string, widgetIframe: HTMLIFrameElement): void {
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:2000;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.6);';
+
+  const box = document.createElement('div');
+  box.style.cssText = 'width:520px;max-width:90vw;height:70vh;max-height:600px;background:#1c1c1c;border:1px solid #303030;border-radius:6px;overflow:hidden;display:flex;flex-direction:column;';
+
+  const dialogIframe = document.createElement('iframe');
+  dialogIframe.setAttribute('sandbox', 'allow-scripts');
+  dialogIframe.style.cssText = 'width:100%;flex:1;border:none;display:block;background:#1c1c1c;';
+  dialogIframe.srcdoc = buildDialogSrcdoc(script);
+  box.appendChild(dialogIframe);
+  overlay.appendChild(box);
+  document.body.appendChild(overlay);
+
+  activeDialog = { reqId, widgetIframe, overlay, dialogIframe };
+
+  overlay.addEventListener('click', (e: MouseEvent) => {
+    if (e.target === overlay) closeWidgetDialog(null);
+  });
+}
+
+function closeWidgetDialog(result: unknown): void {
+  if (!activeDialog) return;
+  const { reqId, widgetIframe, overlay } = activeDialog;
+  activeDialog = null;
+  overlay.remove();
+  widgetIframe.contentWindow?.postMessage({ type: 'widget:dialog-response', reqId, result }, '*');
+}
+
+// Route dialog:close from the active dialog iframe back to the originating widget
+window.addEventListener('message', (e: MessageEvent) => {
+  if (!activeDialog || e.source !== activeDialog.dialogIframe.contentWindow) return;
+  if (!e.data || e.data.type !== 'dialog:close') return;
+  closeWidgetDialog('result' in e.data ? e.data.result : null);
+});
 
 function createWidgetPanels(descriptors: WidgetDescriptor[]): void {
   if (descriptors.length === 0) return;
@@ -487,6 +561,11 @@ function createWidgetPanels(descriptors: WidgetDescriptor[]): void {
           reqId: e.data.reqId,
           value: null,
         }, '*');
+      } else if (msgType === 'widget:dialog-open') {
+        if (activeDialog) return; // one dialog at a time
+        const reqId = String(e.data.reqId ?? '');
+        const script = typeof e.data.script === 'string' ? e.data.script : '';
+        if (reqId && script) openWidgetDialog(reqId, script, iframe);
       }
     });
   }
