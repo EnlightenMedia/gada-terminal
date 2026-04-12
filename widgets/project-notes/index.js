@@ -1,4 +1,9 @@
 (function () {
+  var loading = document.createElement('p');
+  loading.style.cssText = 'color:#555;font-size:11px;padding:4px 0;';
+  loading.textContent = 'Loading\u2026';
+  document.body.appendChild(loading);
+
   var textarea = document.createElement('textarea');
   textarea.style.cssText = [
     'width:100%;height:200px;resize:vertical;',
@@ -6,7 +11,7 @@
     'border:1px solid #2a2a2a;border-radius:3px;',
     'padding:6px;font-size:12px;line-height:1.5;',
     'font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;',
-    'outline:none;',
+    'outline:none;display:none;',
   ].join('');
   textarea.placeholder = 'Notes for this project\u2026';
   document.body.appendChild(textarea);
@@ -18,6 +23,8 @@
 
     window.WidgetAPI.storage.get(storageKey).then(function (value) {
       if (value) textarea.value = value;
+      loading.style.display = 'none';
+      textarea.style.display = 'block';
     });
 
     textarea.addEventListener('input', function () {
