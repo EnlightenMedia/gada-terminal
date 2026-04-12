@@ -130,6 +130,31 @@ WidgetAPI.getContext().then(function(cwd) {
 No capability declaration required. No approval prompt. Returns an empty
 string if called before a session is started.
 
+#### `WidgetAPI.storage.get(key)` → `Promise<string | null>`
+
+Retrieves a previously stored string value for the given key. Returns `null`
+if no value has been stored. Storage is scoped to the widget — two widgets
+with different IDs cannot read each other's data.
+
+```js
+WidgetAPI.storage.get('my-key').then(function(value) {
+  if (value !== null) console.log('stored:', value);
+});
+```
+
+#### `WidgetAPI.storage.set(key, value)` → `Promise<void>`
+
+Stores a string value under the given key. Values persist across app restarts.
+Both key and value must be strings.
+
+```js
+WidgetAPI.storage.set('my-key', 'hello').then(function() {
+  console.log('saved');
+});
+```
+
+No capability declaration required. No approval prompt.
+
 #### `WidgetAPI.getTheme()`
 
 Returns the current UI theme as a plain object.

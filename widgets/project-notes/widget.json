@@ -1,0 +1,9 @@
+{
+  "id": "project-notes",
+  "name": "Project Notes",
+  "version": "1.0.0",
+  "description": "A scratchpad for notes about the current project. Content persists per working directory.",
+  "entry": "index.js",
+  "permissions": [],
+  "capabilities": []
+}
