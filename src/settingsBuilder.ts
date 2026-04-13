@@ -22,7 +22,6 @@ function buildAppHooks(port: number): HooksConfig {
     hooks: [{ type: 'http', url: `http://127.0.0.1:${port}/hooks` }],
   };
   return {
-    PreToolUse: [entry],
     PostToolUse: [entry],
     PostToolUseFailure: [entry],
   };
@@ -85,7 +84,7 @@ export function buildSettingsArgs(port: number, args: string[]): string[] {
     merged = {
       ...userSettings,
       hooks: {
-        PreToolUse: [...(userHooks.PreToolUse ?? []), ...(appHooks.PreToolUse ?? [])],
+        ...(userHooks.PreToolUse ? { PreToolUse: userHooks.PreToolUse } : {}),
         PostToolUse: [...(userHooks.PostToolUse ?? []), ...(appHooks.PostToolUse ?? [])],
         PostToolUseFailure: [
           ...(userHooks.PostToolUseFailure ?? []),

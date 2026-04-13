@@ -37,15 +37,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('hook:tool-event', (_, event) => callback(event)),
   onApiRequest: (callback: (event: unknown) => void) =>
     ipcRenderer.on('hook:api-request', (_, event) => callback(event)),
-  onPermissionRequest: (callback: (req: unknown) => void) =>
-    ipcRenderer.on('hook:permission-request', (_, req) => callback(req)),
-  onPermissionMode: (callback: (mode: string) => void) =>
-    ipcRenderer.on('hook:permission-mode', (_, mode) => callback(mode)),
-  onPermissionCancelled: (callback: (id: string) => void) =>
-    ipcRenderer.on('hook:permission-cancelled', (_, id) => callback(id)),
-  decidePermission: (id: string, decision: string, reason?: string) =>
-    ipcRenderer.invoke('permission:decide', id, decision, reason),
-
   // File drag-and-drop path extraction (File.path unavailable with context isolation)
   getPathForFile: (file: File) => webUtils.getPathForFile(file),
 

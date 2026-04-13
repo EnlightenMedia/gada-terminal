@@ -1,7 +1,7 @@
 import '@xterm/xterm/css/xterm.css';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
-import type { LaunchOptions, FolderSettings, ToolEvent, ApiRequestEvent, PermissionRequest, PermissionDecision, WidgetDescriptor, WidgetCapabilityRequest } from './types';
+import type { LaunchOptions, FolderSettings, ToolEvent, ApiRequestEvent, WidgetDescriptor, WidgetCapabilityRequest } from './types';
 
 // ── Terminal setup ────────────────────────────────────────────────────────────
 
@@ -797,29 +797,13 @@ btnPermHistory.addEventListener('click', () => permHistoryPopup.classList.remove
 permPopupClose.addEventListener('click', () => permHistoryPopup.classList.add('hidden'));
 permPopupBackdrop.addEventListener('click', () => permHistoryPopup.classList.add('hidden'));
 
-const permModeBadge = document.getElementById('perm-mode-badge') as HTMLElement;
-const PERM_MODE_LABELS: Record<string, string> = {
-  default: 'default',
-  acceptEdits: 'accept edits',
-  bypassPermissions: 'bypass',
-  dontAsk: "don't ask",
-  plan: 'plan',
-  auto: 'auto',
-};
-
-window.electronAPI.onPermissionMode((mode: string) => {
-  permModeBadge.textContent = PERM_MODE_LABELS[mode] ?? mode;
-  permModeBadge.className = `perm-mode-badge mode-${mode}`;
-  permModeBadge.style.display = '';
-});
-
 function showPermissionsSection(): void {
   if (!hiddenSections.has('permissions')) return;
   hiddenSections.delete('permissions');
   applyPanelState();
 }
 
-function addPermHistory(req: PermissionRequest, label: string, badgeClass: string): void {
+function addPermHistory(req: { toolName: string; input: Record<string, unknown>; timestamp: number }, label: string, badgeClass: string): void {
   const item = document.createElement('div');
   item.className = 'perm-popup-item';
 
@@ -854,101 +838,6 @@ function addPermHistory(req: PermissionRequest, label: string, badgeClass: strin
   item.appendChild(targetEl);
   permPopupList.prepend(item);
 }
-
-function formatPermInput(input: Record<string, unknown>): string {
-  const MAX_VAL = 120;
-  return Object.entries(input).map(([k, v]) => {
-    let s = typeof v === 'string' ? v : JSON.stringify(v);
-    s = s.replace(/\\n/g, '\n').replace(/\\t/g, '\t');
-    if (s.length > MAX_VAL) s = s.slice(0, MAX_VAL) + '…';
-    return `${k}: ${s}`;
-  }).join('\n');
-}
-
-function createPermCard(req: PermissionRequest): HTMLElement {
-  const card = document.createElement('div');
-  card.className = 'perm-card';
-  card.dataset['permId'] = req.id;
-
-  const header = document.createElement('div');
-  header.className = 'perm-card-header';
-
-  const time = document.createElement('span');
-  time.className = 'perm-card-time';
-  time.textContent = formatTime(req.timestamp);
-
-  const name = document.createElement('span');
-  name.className = 'perm-card-name';
-  name.textContent = req.toolName;
-
-  const badge = document.createElement('span');
-  badge.className = 'perm-badge pending';
-  badge.textContent = 'waiting';
-
-  header.appendChild(time);
-  header.appendChild(name);
-  header.appendChild(badge);
-
-  const inputEl = document.createElement('pre');
-  inputEl.className = 'perm-card-input';
-  inputEl.textContent = formatPermInput(req.input);
-
-  const noteInput = document.createElement('input');
-  noteInput.type = 'text';
-  noteInput.className = 'perm-card-note';
-  noteInput.placeholder = 'Add a note (optional)';
-
-  const actions = document.createElement('div');
-  actions.className = 'perm-card-actions';
-
-  function decide(decision: PermissionDecision, label: string, badgeClass: string): void {
-    const reason = noteInput.value.trim() || undefined;
-    card.remove();
-    addPermHistory(req, label, badgeClass);
-    window.electronAPI.decidePermission(req.id, decision, reason);
-  }
-
-  const btnAllow = document.createElement('button');
-  btnAllow.className = 'perm-btn allow';
-  btnAllow.textContent = 'Allow';
-  btnAllow.addEventListener('click', () => decide('allow', 'allowed', 'allowed'));
-
-  const btnSession = document.createElement('button');
-  btnSession.className = 'perm-btn session';
-  btnSession.textContent = 'Session';
-  btnSession.addEventListener('click', () => decide('allow-session', 'session', 'session'));
-
-  const btnDeny = document.createElement('button');
-  btnDeny.className = 'perm-btn deny';
-  btnDeny.textContent = 'Deny';
-  btnDeny.addEventListener('click', () => decide('deny', 'denied', 'denied'));
-
-  actions.appendChild(btnAllow);
-  actions.appendChild(btnSession);
-  actions.appendChild(btnDeny);
-
-  card.appendChild(header);
-  card.appendChild(inputEl);
-  card.appendChild(noteInput);
-  card.appendChild(actions);
-
-  return card;
-}
-
-window.electronAPI.onPermissionRequest((req: PermissionRequest) => {
-  if (hiddenSections.has('permissions')) {
-    window.electronAPI.decidePermission(req.id, 'passthrough');
-    return;
-  }
-  showPermissionsSection();
-  const card = createPermCard(req);
-  permFeed.prepend(card);
-});
-
-window.electronAPI.onPermissionCancelled((id: string) => {
-  const card = permFeed.querySelector(`[data-perm-id="${id}"]`);
-  if (card) card.remove();
-});
 
 // ── Widget capability approval cards ─────────────────────────────────────────
 
@@ -992,7 +881,7 @@ function createWidgetCapabilityCard(req: WidgetCapabilityRequest): HTMLElement {
   function decide(decision: 'allow' | 'allow-session' | 'deny', label: string, badgeClass: string): void {
     card.remove();
     addPermHistory(
-      { id: req.id, toolName: `${req.widgetName} · ${req.capability}`, input: {}, timestamp: req.timestamp },
+      { toolName: `${req.widgetName} · ${req.capability}`, input: {}, timestamp: req.timestamp },
       label,
       badgeClass
     );

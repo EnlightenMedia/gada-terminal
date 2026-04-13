@@ -41,15 +41,6 @@ export interface ApiRequestEvent {
   durationMs: number;
 }
 
-export type PermissionDecision = 'allow' | 'allow-session' | 'deny' | 'passthrough';
-
-export interface PermissionRequest {
-  id: string;
-  toolName: string;
-  input: Record<string, unknown>;
-  timestamp: number;
-}
-
 declare global {
   interface Window {
     electronAPI: {
@@ -74,18 +65,11 @@ declare global {
       getFolderSettings: (folder: string) => Promise<FolderSettings>;
       getAllFolderSettings: () => Promise<Record<string, FolderSettings>>;
 
-      // Renderer → Main (invoke, returns Promise)
-      decidePermission: (id: string, decision: PermissionDecision, reason?: string) => Promise<void>;
-
       // Main → Renderer (event subscriptions)
       onTerminalData: (callback: (data: string) => void) => void;
       onTerminalExit: (callback: (code: number) => void) => void;
       onToolEvent: (callback: (event: ToolEvent) => void) => void;
       onApiRequest: (callback: (event: ApiRequestEvent) => void) => void;
-      onPermissionRequest: (callback: (req: PermissionRequest) => void) => void;
-      onPermissionMode: (callback: (mode: string) => void) => void;
-      onPermissionCancelled: (callback: (id: string) => void) => void;
-
       // File drag-and-drop (requires webUtils, not available via standard File.path with context isolation)
       getPathForFile: (file: File) => string;
 

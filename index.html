@@ -924,23 +924,6 @@
     .perm-btn.deny     { background: #2e1a1a; color: #e84e4e; border-color: #5a2a2a; }
     .perm-btn.override { background: transparent; color: #6a6a8a; border-color: #3a3a5a; }
 
-    /* Permission mode badge in section header */
-    .perm-mode-badge {
-      font-size: 9px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      padding: 2px 5px;
-      border-radius: 3px;
-      margin-left: 6px;
-    }
-    .perm-mode-badge.mode-default         { background: #222; color: #555; border: 1px solid #333; }
-    .perm-mode-badge.mode-acceptEdits     { background: #0e1a22; color: #4eb8e8; border: 1px solid #1e3a5a; }
-    .perm-mode-badge.mode-bypassPermissions,
-    .perm-mode-badge.mode-dontAsk         { background: #2e1e0a; color: #e8a838; border: 1px solid #5a3e10; }
-    .perm-mode-badge.mode-plan            { background: #1a1222; color: #a878e8; border: 1px solid #3a2a5a; }
-    .perm-mode-badge.mode-auto            { background: #122212; color: #4ec94e; border: 1px solid #1e4a1e; }
-
     /* History button in section header */
     .perm-history-btn {
       margin-left: auto;
@@ -1481,7 +1464,6 @@
         <div class="panel-section hidden" id="section-permissions" draggable="true" data-section-id="permissions">
           <div class="panel-section-header">
             <span class="panel-section-title">Permissions</span>
-            <span id="perm-mode-badge" class="perm-mode-badge" style="display:none"></span>
             <button id="btn-perm-history" class="perm-history-btn">History</button>
           </div>
           <div class="panel-section-body" id="permissions-feed"></div>
