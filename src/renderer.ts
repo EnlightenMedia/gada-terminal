@@ -1273,9 +1273,10 @@ function renderWidgetMgmt(): void {
     header.appendChild(nameEl);
     header.appendChild(versionEl);
     if (desc.os && desc.os.length > 0) {
+      const OS_DISPLAY: Record<string, string> = { win32: 'Windows', darwin: 'macOS', linux: 'Linux' };
       const osBadge = document.createElement('span');
       osBadge.className = 'widget-os-badge';
-      osBadge.textContent = desc.os.join(', ');
+      osBadge.textContent = desc.os.map(p => OS_DISPLAY[p] ?? p).join(', ');
       osBadge.title = `Platform-restricted: ${desc.os.join(', ')}`;
       header.appendChild(osBadge);
     }
