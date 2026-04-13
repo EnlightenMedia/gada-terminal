@@ -709,8 +709,20 @@ window.electronAPI.onToolEvent((event: ToolEvent) => {
       toolPopupList.prepend(oldest);
     }
   } else {
-    const card = toolCardMap.get(event.id);
-    if (card) updateToolCard(card, event);
+    let card = toolCardMap.get(event.id);
+    if (!card) {
+      // No PreToolUse card exists — create one now and add it to the feed
+      card = createToolCard(event);
+      toolCardMap.set(event.id, card);
+      toolsFeed.prepend(card);
+      liveFeedCards.unshift(card);
+      while (liveFeedCards.length > MAX_LIVE_TOOLS) {
+        const oldest = liveFeedCards.pop()!;
+        oldest.remove();
+        toolPopupList.prepend(oldest);
+      }
+    }
+    updateToolCard(card, event);
 
     if (event.event === 'PostToolUseFailure') {
       const errCard = createErrorCard(event);
