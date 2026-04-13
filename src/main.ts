@@ -3,7 +3,7 @@ if (squirrelStartup) process.exit(0);
 
 import { app, BrowserWindow, ipcMain, clipboard, Menu, dialog, screen } from 'electron';
 import * as path from 'path';
-import { existsSync, readdirSync, readFileSync, statSync } from 'fs';
+import { existsSync, readdirSync, readFileSync, statSync, writeFileSync, unlinkSync, mkdirSync } from 'fs';
 import { execFile, spawn } from 'child_process';
 import * as https from 'https';
 import * as http from 'http';
@@ -189,7 +189,10 @@ function clampBoundsToScreens(
 }
 
 async function createWindow(): Promise<void> {
-  userDataPath = app.getPath('userData');
+  // Use the shared base path for our persistence so all instances read and write
+  // the same settings. Electron's internal caches (GPU, disk) use the per-instance
+  // path set via app.setPath('userData') above.
+  userDataPath = baseUserData;
   widgets = loadWidgets(userDataPath);
 
   // Start hook server before showing the window so hookPort is ready for spawn
@@ -555,6 +558,48 @@ ipcMain.on('widget:revoke-grant', (_, widgetId: string, capability: string) => {
 // Clipboard
 ipcMain.handle('clipboard:read', () => clipboard.readText());
 ipcMain.handle('clipboard:write', (_, text: string) => clipboard.writeText(text));
+
+// ── Multi-instance isolation ──────────────────────────────────────────────────
+// Each instance claims the lowest available slot and gets its own userData dir.
+// Slots are coordinated via lock files in the base userData directory.
+
+const baseUserData = app.getPath('userData');
+const lockDir = path.join(baseUserData, 'instances');
+
+function isPidRunning(pid: number): boolean {
+  try { process.kill(pid, 0); return true; } catch { return false; }
+}
+
+function acquireInstanceSlot(): number {
+  mkdirSync(lockDir, { recursive: true });
+  for (let slot = 0; slot < 32; slot++) {
+    const lockFile = path.join(lockDir, `slot-${slot}.lock`);
+    if (existsSync(lockFile)) {
+      try {
+        const pid = parseInt(readFileSync(lockFile, 'utf-8').trim(), 10);
+        if (!isNaN(pid) && isPidRunning(pid)) continue; // slot is live
+      } catch { /* unreadable lock — treat as stale */ }
+    }
+    // Slot is free — claim it
+    writeFileSync(lockFile, String(process.pid), 'utf-8');
+    return slot;
+  }
+  return 0; // fallback: too many instances, reuse slot 0
+}
+
+const instanceSlot = acquireInstanceSlot();
+const instanceUserData = path.join(baseUserData, `instance-${instanceSlot}`);
+
+app.setPath('userData', instanceUserData);
+
+let instanceLockFile: string | null = path.join(lockDir, `slot-${instanceSlot}.lock`);
+
+app.on('will-quit', () => {
+  if (instanceLockFile && existsSync(instanceLockFile)) {
+    try { unlinkSync(instanceLockFile); } catch { /* best effort */ }
+    instanceLockFile = null;
+  }
+});
 
 // App lifecycle
 
