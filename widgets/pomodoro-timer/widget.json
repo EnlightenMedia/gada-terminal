@@ -1,0 +1,9 @@
+{
+  "id": "pomodoro-timer",
+  "name": "Pomodoro Timer",
+  "version": "1.0.0",
+  "description": "Focus timer with configurable work and break intervals. Tracks completed pomodoros and total focused time for the session.",
+  "entry": "index.js",
+  "permissions": [],
+  "capabilities": []
+}

@@ -231,12 +231,18 @@ function savePanelLayout(): void {
 }
 
 function applyPanelState(): void {
-  // Move each section DOM element to its correct sidebar container
-  for (const id of sectionOrder) {
+  // Place each section in its correct sidebar container.
+  // Use CSS order for same-container reordering to avoid moving iframe DOM nodes,
+  // which would cause the iframe to reload and lose widget state.
+  for (const [idx, id] of sectionOrder.entries()) {
     const el = document.getElementById(`section-${id}`);
     if (!el) continue;
     const target = getSectionSide(id) === 'left' ? panelLeftSections : panelRightSections;
-    target.appendChild(el);
+    if (el.parentElement !== target) {
+      target.appendChild(el); // cross-container move — necessary, iframe will reload
+    } else {
+      (el as HTMLElement).style.order = String(idx); // same container — reorder without DOM move
+    }
   }
   // Apply hidden/visible
   for (const id of sectionOrder) {
@@ -354,7 +360,7 @@ function buildSrcdoc(desc: WidgetDescriptor): string {
     sendClaudeMessage:function(text){return _req('claude:message',[text]);},
     spawnProcess:function(cmd,args){return _req('process:spawn',[cmd,args||[]]);},
     httpRequest:function(url,opts){return _req('http:request',[url,opts||{}]);},
-    openDialog:function(script){return new Promise(function(res,rej){var reqId=Math.random().toString(36).slice(2)+Date.now();_p[reqId]={resolve:res,reject:rej};window.parent.postMessage({type:'widget:dialog-open',script:script,reqId:reqId},'*');});},
+    openDialog:function(script,opts){return new Promise(function(res,rej){var reqId=Math.random().toString(36).slice(2)+Date.now();_p[reqId]={resolve:res,reject:rej};window.parent.postMessage({type:'widget:dialog-open',script:script,reqId:reqId,opts:opts||{}},'*');});},
     getContext:function(){return new Promise(function(res,rej){var reqId=Math.random().toString(36).slice(2)+Date.now();_p[reqId]={resolve:res,reject:rej};window.parent.postMessage({type:'widget:context-request',reqId:reqId},'*');});},
     storage:{
       get:function(key){return new Promise(function(res,rej){var reqId=Math.random().toString(36).slice(2)+Date.now();_p[reqId]={resolve:res,reject:rej};window.parent.postMessage({type:'widget:storage-get',key:key,reqId:reqId},'*');});},
@@ -434,12 +440,15 @@ function buildDialogSrcdoc(script: string): string {
   ].join('\n');
 }
 
-function openWidgetDialog(reqId: string, script: string, widgetIframe: HTMLIFrameElement): void {
+function openWidgetDialog(reqId: string, script: string, widgetIframe: HTMLIFrameElement, opts: Record<string, unknown> = {}): void {
   const overlay = document.createElement('div');
   overlay.style.cssText = 'position:fixed;inset:0;z-index:2000;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.6);';
 
+  const w = typeof opts['width'] === 'number' ? `${opts['width']}px` : '520px';
+  const h = typeof opts['height'] === 'number' ? `${opts['height']}px` : '70vh';
+  const maxH = typeof opts['height'] === 'number' ? `${opts['height']}px` : '600px';
   const box = document.createElement('div');
-  box.style.cssText = 'width:520px;max-width:90vw;height:70vh;max-height:600px;background:#1c1c1c;border:1px solid #303030;border-radius:6px;overflow:hidden;display:flex;flex-direction:column;';
+  box.style.cssText = `width:${w};max-width:90vw;height:${h};max-height:${maxH};background:#1c1c1c;border:1px solid #303030;border-radius:6px;overflow:hidden;display:flex;flex-direction:column;`;
 
   const dialogIframe = document.createElement('iframe');
   dialogIframe.setAttribute('sandbox', 'allow-scripts');
@@ -565,7 +574,8 @@ function createWidgetPanels(descriptors: WidgetDescriptor[]): void {
         if (activeDialog) return; // one dialog at a time
         const reqId = String(e.data.reqId ?? '');
         const script = typeof e.data.script === 'string' ? e.data.script : '';
-        if (reqId && script) openWidgetDialog(reqId, script, iframe);
+        const opts = e.data.opts && typeof e.data.opts === 'object' ? e.data.opts : {};
+        if (reqId && script) openWidgetDialog(reqId, script, iframe, opts);
       }
     });
   }
