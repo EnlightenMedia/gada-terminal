@@ -1,7 +1,7 @@
 # Slice 21 — Open Terminal Widget
 
 **Roadmap:** [Gada Terminal Roadmap](../roadmaps/2026-04-06-gada-terminal.md)
-**Status:** [ ] Not started
+**Status:** [x] Complete
 
 ---
 
