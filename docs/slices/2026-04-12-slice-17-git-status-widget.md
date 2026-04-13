@@ -1,7 +1,7 @@
 # Slice 17 — Git Status Widget
 
 **Roadmap:** [2026-04-06-gada-terminal.md](../roadmaps/2026-04-06-gada-terminal.md)
-**Status:** `[~] In progress`
+**Status:** `[x] Complete`
 
 ---
 
@@ -66,15 +66,15 @@ rather than showing a blank panel or silent failure.
 
 ## Done Criteria
 
-- [ ] Opening the Git Status Widget in a git repo shows the output of
+- [x] Opening the Git Status Widget in a git repo shows the output of
   `git status --short` and `git log --oneline -5` for the active project directory
-- [ ] Clicking the refresh button re-fetches and re-renders the output
-- [ ] Opening the widget in a non-git directory shows a clear "not a git repo"
+- [x] Clicking the refresh button re-fetches and re-renders the output
+- [x] Opening the widget in a non-git directory shows a clear "not a git repo"
   message rather than an error or blank panel
-- [ ] The first use of the widget triggers the `process:spawn` capability
+- [x] The first use of the widget triggers the `process:spawn` capability
   approval prompt; subsequent uses within the session do not
-- [ ] The widget works correctly on Windows (git output is fetched and displayed)
+- [x] The widget works correctly on Windows (git output is fetched and displayed)
 
 ---
 
-**Status:** `[~] In progress`
+**Status:** `[x] Complete`
