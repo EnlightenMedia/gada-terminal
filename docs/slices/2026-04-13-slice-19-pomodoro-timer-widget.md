@@ -1,7 +1,7 @@
 # Slice 19 — Pomodoro Timer Widget
 
 **Roadmap:** [2026-04-06-gada-terminal.md](../roadmaps/2026-04-06-gada-terminal.md)
-**Status:** `[ ] Not started`
+**Status:** `[x] Complete`
 
 ---
 
@@ -78,4 +78,4 @@ the feature scope.
 
 ---
 
-**Status:** `[ ] Not started`
+**Status:** `[x] Complete`
