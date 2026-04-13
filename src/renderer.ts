@@ -815,6 +815,13 @@ function showPermissionsSection(): void {
   applyPanelState();
 }
 
+function hidePermissionsSectionIfEmpty(): void {
+  if (permFeed.children.length === 0 && !hiddenSections.has('permissions')) {
+    hiddenSections.add('permissions');
+    applyPanelState();
+  }
+}
+
 function addPermHistory(req: { toolName: string; input: Record<string, unknown>; timestamp: number }, label: string, badgeClass: string): void {
   const item = document.createElement('div');
   item.className = 'perm-popup-item';
@@ -892,6 +899,7 @@ function createWidgetCapabilityCard(req: WidgetCapabilityRequest): HTMLElement {
 
   function decide(decision: 'allow' | 'allow-session' | 'deny', label: string, badgeClass: string): void {
     card.remove();
+    hidePermissionsSectionIfEmpty();
     addPermHistory(
       { toolName: `${req.widgetName} · ${req.capability}`, input: {}, timestamp: req.timestamp },
       label,
@@ -1261,6 +1269,7 @@ function refreshSettingsPopup(): void {
   settingsPopupList.innerHTML = '';
 
   for (const id of sectionOrder) {
+    if (id === 'permissions') continue; // auto-managed; not user-toggleable
     const name = sectionNames.get(id) ?? id;
     const isHidden = hiddenSections.has(id);
 
@@ -1439,6 +1448,7 @@ function applySettings(settings: FolderSettings): void {
     sectionOrder = [...layout.order, ...allSectionIds.filter(s => !known.has(s))];
     hiddenSections.clear();
     for (const id of layout.hidden) hiddenSections.add(id);
+    hiddenSections.add('permissions'); // always start hidden; auto-shows on capability request
     // Load side assignments
     sectionSides.clear();
     if (layout.sides) {
