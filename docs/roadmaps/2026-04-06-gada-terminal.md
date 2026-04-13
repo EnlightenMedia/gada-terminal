@@ -1,6 +1,8 @@
 # Gada Terminal Roadmap
 
 **Goal:** Build a cross-platform Electron desktop app that wraps the Claude Code CLI with a real-time monitoring sidebar for tool calls, cost, context usage, and permission approval.
+
+> **Note — Permission approval (2026-04-13):** The `PreToolUse` hook was removed because registering it intercepts Claude Code's native permission system entirely — an empty `{}` response silently auto-approves rather than falling back to the terminal prompt. There is currently no way to get a notification-only hook that lets Claude's own approval flow proceed. The permissions section in the sidebar remains for widget capability approvals only. **Revisit this if Claude Code adds a non-blocking/notification-only hook type.**
 **Approach:** Windows-first incremental delivery, cutting vertically through all layers each slice. Start with a working terminal, add the launch screen, then layer in the HTTP hook server and each sidebar panel one at a time before finishing with persistence polish and the plugin framework.
 **Created:** 2026-04-06
 
