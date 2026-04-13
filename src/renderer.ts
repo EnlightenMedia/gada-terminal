@@ -360,6 +360,7 @@ function buildSrcdoc(desc: WidgetDescriptor): string {
     sendClaudeMessage:function(text){return _req('claude:message',[text]);},
     spawnProcess:function(cmd,args){return _req('process:spawn',[cmd,args||[]]);},
     httpRequest:function(url,opts){return _req('http:request',[url,opts||{}]);},
+    shellLaunch:function(opts){return _req('shell:launch',[opts||{}]);},
     openDialog:function(script,opts){return new Promise(function(res,rej){var reqId=Math.random().toString(36).slice(2)+Date.now();_p[reqId]={resolve:res,reject:rej};window.parent.postMessage({type:'widget:dialog-open',script:script,reqId:reqId,opts:opts||{}},'*');});},
     getContext:function(){return new Promise(function(res,rej){var reqId=Math.random().toString(36).slice(2)+Date.now();_p[reqId]={resolve:res,reject:rej};window.parent.postMessage({type:'widget:context-request',reqId:reqId},'*');});},
     storage:{
@@ -865,6 +866,7 @@ const CAPABILITY_LABELS: Record<string, string> = {
   'claude:message': 'Send Claude a message',
   'process:spawn': 'Spawn a process',
   'http:request': 'Make HTTP requests',
+  'shell:launch': 'Open a terminal window',
 };
 
 function createWidgetCapabilityCard(req: WidgetCapabilityRequest): HTMLElement {
@@ -1085,6 +1087,7 @@ const CAPABILITY_LABELS_MGMT: Record<string, string> = {
   'claude:message': 'claude:message',
   'process:spawn': 'process:spawn',
   'http:request': 'http:request',
+  'shell:launch': 'shell:launch',
 };
 
 async function openWidgetMgmt(): Promise<void> {

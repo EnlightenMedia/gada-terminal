@@ -4,7 +4,7 @@ if (squirrelStartup) process.exit(0);
 import { app, BrowserWindow, ipcMain, clipboard, Menu, dialog, screen } from 'electron';
 import * as path from 'path';
 import { existsSync, readdirSync, readFileSync, statSync } from 'fs';
-import { execFile } from 'child_process';
+import { execFile, spawn } from 'child_process';
 import * as https from 'https';
 import * as http from 'http';
 import * as pty from 'node-pty';
@@ -411,6 +411,55 @@ function executeCapability(capability: string, args: unknown[]): Promise<{ ok: b
         req.on('error', (err: Error) => resolve({ ok: false, error: err.message }));
         if (opts.body) req.write(opts.body);
         req.end();
+      } else if (capability === 'shell:launch') {
+        const opts = (args[0] && typeof args[0] === 'object' ? args[0] : {}) as {
+          mode?: string; terminal?: string; cwd?: string;
+        };
+        if (opts.mode === 'probe') {
+          // Return which terminal executables are available on PATH
+          const candidates = [
+            { id: 'wt',          label: 'Windows Terminal', exe: 'wt.exe' },
+            { id: 'pwsh',        label: 'PowerShell 7',     exe: 'pwsh.exe' },
+            { id: 'powershell',  label: 'Windows PowerShell', exe: 'powershell.exe' },
+            { id: 'cmd',         label: 'Command Prompt',   exe: 'cmd.exe' },
+          ];
+          const checks = candidates.map(c => new Promise<typeof c | null>(res => {
+            execFile('where.exe', [c.exe], { timeout: 3000 }, (err) => res(err ? null : c));
+          }));
+          Promise.all(checks).then(results => {
+            resolve({ ok: true, result: results.filter(Boolean) });
+          });
+        } else if (opts.mode === 'launch') {
+          const terminal = opts.terminal ?? 'cmd';
+          const cwd = typeof opts.cwd === 'string' ? opts.cwd : '';
+          // Use `cmd /c start` to open console apps in a new visible window.
+          // wt is a GUI app that manages its own window, but routing it through
+          // start is harmless and keeps the pattern consistent.
+          let innerCmd: string;
+          let innerArgs: string[];
+          if (terminal === 'wt') {
+            innerCmd = 'wt.exe'; innerArgs = ['-d', cwd];
+          } else if (terminal === 'pwsh') {
+            innerCmd = 'pwsh.exe'; innerArgs = ['-NoExit', '-Command', `Set-Location '${cwd}'`];
+          } else if (terminal === 'powershell') {
+            innerCmd = 'powershell.exe'; innerArgs = ['-NoExit', '-Command', `Set-Location '${cwd}'`];
+          } else {
+            innerCmd = 'cmd.exe'; innerArgs = ['/K', `cd /d "${cwd}"`];
+          }
+          try {
+            const child = spawn('cmd.exe', ['/c', 'start', '', innerCmd, ...innerArgs], {
+              detached: true,
+              stdio: 'ignore',
+              shell: false,
+            });
+            child.unref();
+            resolve({ ok: true });
+          } catch (err) {
+            resolve({ ok: false, error: String(err) });
+          }
+        } else {
+          resolve({ ok: false, error: 'shell:launch requires mode "probe" or "launch"' });
+        }
       } else {
         resolve({ ok: false, error: `Unknown capability: ${capability}` });
       }

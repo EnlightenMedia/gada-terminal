@@ -1,0 +1,10 @@
+{
+  "id": "open-terminal",
+  "name": "Open Terminal",
+  "version": "1.0.0",
+  "description": "Opens a native terminal window in the current project directory. Windows only.",
+  "entry": "index.js",
+  "permissions": [],
+  "capabilities": ["shell:launch"],
+  "os": ["win32"]
+}
