@@ -1272,6 +1272,13 @@ function renderWidgetMgmt(): void {
 
     header.appendChild(nameEl);
     header.appendChild(versionEl);
+    if (desc.os && desc.os.length > 0) {
+      const osBadge = document.createElement('span');
+      osBadge.className = 'widget-os-badge';
+      osBadge.textContent = desc.os.join(', ');
+      osBadge.title = `Platform-restricted: ${desc.os.join(', ')}`;
+      header.appendChild(osBadge);
+    }
     header.appendChild(toggleLabel);
     row.appendChild(header);
 

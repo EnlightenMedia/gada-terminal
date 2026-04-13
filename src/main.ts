@@ -54,9 +54,12 @@ function loadWidgets(userDataPath: string): WidgetDescriptor[] {
 
       try {
         const manifest = JSON.parse(readFileSync(manifestPath, 'utf-8'));
-        const { id, name, version, entry: entryFile, permissions, capabilities } = manifest;
+        const { id, name, version, entry: entryFile, permissions, capabilities, os } = manifest;
         if (!id || typeof id !== 'string' || !entryFile || typeof entryFile !== 'string') continue;
         if (seen.has(id)) continue;
+
+        // Skip widgets that declare an os list that doesn't include the current platform
+        if (Array.isArray(os) && !os.includes(process.platform)) continue;
 
         const entryPath = path.join(widgetDir, entryFile);
         if (!existsSync(entryPath)) continue;
@@ -69,6 +72,7 @@ function loadWidgets(userDataPath: string): WidgetDescriptor[] {
           permissions: Array.isArray(permissions) ? permissions : [],
           capabilities: Array.isArray(capabilities) ? capabilities : [],
           entrySource: readFileSync(entryPath, 'utf-8'),
+          os: Array.isArray(os) ? os : undefined,
         });
       } catch { /* skip invalid widgets silently */ }
     }

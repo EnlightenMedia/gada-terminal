@@ -9,6 +9,7 @@ export interface WidgetDescriptor {
   permissions: string[];
   capabilities: string[];
   entrySource: string;
+  os?: string[];
 }
 
 export interface WidgetCapabilityRequest {
