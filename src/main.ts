@@ -88,7 +88,16 @@ let hookServerClose: (() => void) | null = null;
 let hookDecidePermission: ((id: string, decision: PermissionDecision, reason?: string) => void) | null = null;
 
 const sessionAllowedTools = new Set<string>();
-const pendingToolNames = new Map<string, string>(); // id → toolName
+const pendingToolNames = new Map<string, { toolName: string; input: Record<string, unknown> }>(); // id → { toolName, input }
+
+function sessionKey(toolName: string, input: Record<string, unknown>): string {
+  if (toolName === 'Bash') {
+    const command = typeof input['command'] === 'string' ? input['command'] : '';
+    const firstToken = command.trimStart().split(/\s+/)[0] ?? '';
+    return 'Bash:' + firstToken;
+  }
+  return toolName + ':' + JSON.stringify(input);
+}
 
 // Widget capability grants
 // sessionGranted: widgetId → Set<capability>  (in-memory, cleared on restart)
@@ -205,11 +214,11 @@ async function createWindow(): Promise<void> {
       }
     },
     (req: PermissionRequest) => {
-      if (sessionAllowedTools.has(req.toolName)) {
+      if (sessionAllowedTools.has(sessionKey(req.toolName, req.input))) {
         hookDecidePermission?.(req.id, 'allow');
         return;
       }
-      pendingToolNames.set(req.id, req.toolName);
+      pendingToolNames.set(req.id, { toolName: req.toolName, input: req.input });
       if (mainWindow && !mainWindow.isDestroyed()) {
         mainWindow.webContents.send('hook:permission-request', req);
       }
@@ -366,8 +375,8 @@ ipcMain.on('window:set-accent-color', (_, color: string | null) => {
 // Permission approval
 ipcMain.handle('permission:decide', (_, id: string, decision: PermissionDecision, reason?: string) => {
   if (decision === 'allow-session') {
-    const toolName = pendingToolNames.get(id);
-    if (toolName) sessionAllowedTools.add(toolName);
+    const pending = pendingToolNames.get(id);
+    if (pending) sessionAllowedTools.add(sessionKey(pending.toolName, pending.input));
   }
   pendingToolNames.delete(id);
   hookDecidePermission?.(id, decision, reason);
