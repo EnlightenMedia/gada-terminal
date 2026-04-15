@@ -108,6 +108,15 @@
   ].join('');
   controls.appendChild(startBtn);
 
+  var skipBtn = document.createElement('button');
+  skipBtn.textContent = 'Skip';
+  skipBtn.style.cssText = [
+    'padding:4px 10px;font-size:12px;cursor:pointer;',
+    'background:none;color:' + theme.textMuted + ';',
+    'border:1px solid #2e2e2e;border-radius:3px;',
+  ].join('');
+  controls.appendChild(skipBtn);
+
   var resetBtn = document.createElement('button');
   resetBtn.textContent = 'Reset';
   resetBtn.style.cssText = [
@@ -200,6 +209,31 @@
     renderDisplay();
   }
 
+  function skipPhase() {
+    var wasRunning = running;
+    pauseTimer();
+
+    if (phase === 'work') {
+      pomodoroCount += 1;
+      roundsCompleted += 1;
+      if (roundsCompleted >= roundsPerSession) {
+        phase = 'long-break';
+        remaining = longBreakMins * 60;
+        roundsCompleted = 0;
+      } else {
+        phase = 'short-break';
+        remaining = shortBreakMins * 60;
+      }
+      if (wasRunning || autoStartBreak) startTimer();
+    } else {
+      phase = 'work';
+      remaining = workMins * 60;
+      if (wasRunning || autoStartWork) startTimer();
+    }
+
+    renderDisplay();
+  }
+
   function tick() {
     remaining -= 1;
     if (phase === 'work') totalFocusedSecs += 1;
@@ -245,6 +279,8 @@
   startBtn.addEventListener('click', function () {
     if (running) pauseTimer(); else startTimer();
   });
+
+  skipBtn.addEventListener('click', skipPhase);
 
   resetBtn.addEventListener('click', reset);
 
