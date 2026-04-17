@@ -23,6 +23,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   readClipboard: () => ipcRenderer.invoke('clipboard:read'),
   writeClipboard: (text: string) => ipcRenderer.invoke('clipboard:write', text),
   getInitialArgs: () => ipcRenderer.invoke('terminal:get-args'),
+  getSession: () => ipcRenderer.invoke('terminal:get-session'),
   pickFolder: () => ipcRenderer.invoke('folders:pick'),
   getRecentFolders: () => ipcRenderer.invoke('folders:get-recent'),
   getFolderSettings: (folder: string) => ipcRenderer.invoke('folders:get-settings', folder),

@@ -1582,18 +1582,37 @@ btnStart.addEventListener('click', launch);
 extraArgsInput.addEventListener('keydown', (e: KeyboardEvent) => { if (e.key === 'Enter') launch(); });
 
 (async () => {
-  const [recentFolders, initialArgs, settings, descriptors, recentPlugins] = await Promise.all([
+  const [recentFolders, initialArgs, settings, descriptors, recentPlugins, session] = await Promise.all([
     window.electronAPI.getRecentFolders(),
     window.electronAPI.getInitialArgs(),
     window.electronAPI.getAllFolderSettings(),
     window.electronAPI.getWidgetDescriptors(),
     window.electronAPI.getRecentPlugins(),
+    window.electronAPI.getSession(),
   ]);
   allDescriptors = descriptors;
   allFolderSettings = settings;
   if (initialArgs.length > 0) extraArgsInput.value = initialArgs.join(' ');
   renderRecentFolders(recentFolders);
   recentPluginDirs = recentPlugins;
-  applySettings(allFolderSettings[''] ?? {});
+
+  if (session.active) {
+    // Renderer reloaded mid-session (e.g. after hibernate/resume or GPU crash).
+    // The PTY is still alive in main — reconnect without showing the launch screen.
+    selectedFolder = session.folder;
+    const folderSettings = allFolderSettings[session.folder] ?? {};
+    const disabledSet = new Set(folderSettings.disabledWidgets ?? []);
+    createWidgetPanels(allDescriptors.filter(d => !disabledSet.has(d.id)));
+    applySettings(folderSettings);
+    const folderName = session.folder
+      ? session.folder.split(/[\\/]/).filter(Boolean).pop() ?? session.folder
+      : 'Gada Terminal';
+    titlebarText.textContent = folderName;
+    launchScreen.classList.add('hidden');
+    requestAnimationFrame(() => { fitAddon.fit(); window.electronAPI.sendResize(terminal.cols, terminal.rows); });
+  } else {
+    applySettings(allFolderSettings[''] ?? {});
+  }
+
   renderRecentPlugins();
 })();

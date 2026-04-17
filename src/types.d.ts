@@ -60,6 +60,7 @@ declare global {
       readClipboard: () => Promise<string>;
       writeClipboard: (text: string) => Promise<void>;
       getInitialArgs: () => Promise<string[]>;
+      getSession: () => Promise<{ active: boolean; folder: string }>;
       pickFolder: () => Promise<string | null>;
       getRecentFolders: () => Promise<string[]>;
       getFolderSettings: (folder: string) => Promise<FolderSettings>;

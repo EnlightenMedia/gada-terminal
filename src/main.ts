@@ -300,6 +300,8 @@ ipcMain.handle('terminal:get-args', () => {
   return [...fromEnv, ...fromArgv];
 });
 
+ipcMain.handle('terminal:get-session', () => ({ active: ptyProcess !== null, folder: currentFolder }));
+
 ipcMain.handle('folders:pick', async () => {
   if (!mainWindow) return null;
   const result = await dialog.showOpenDialog(mainWindow, {
