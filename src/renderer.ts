@@ -1537,8 +1537,12 @@ function launch(): void {
   const folderSettings = allFolderSettings[folderKey] ?? {};
   const disabledSet = new Set(folderSettings.disabledWidgets ?? []);
   createWidgetPanels(allDescriptors.filter(d => !disabledSet.has(d.id)));
-  // Re-apply panel layout so saved order includes widget sections
+  // Re-apply panel layout so saved order includes widget sections.
+  // Preserve the accent color the user may have changed on the launch screen
+  // before applySettings overwrites it with the persisted value.
+  const chosenAccent = accentColorInput.value;
   applySettings(folderSettings);
+  setAccentColor(chosenAccent);
 
   if (selectedPluginDirs.length > 0) {
     window.electronAPI.addRecentPlugins(selectedPluginDirs);
